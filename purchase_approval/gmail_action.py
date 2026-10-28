@@ -11,7 +11,7 @@ import frappe
 from frappe.utils import add_to_date, get_datetime, now_datetime
 
 
-CALLBACK_PATH = "/api/method/purchase_approval_navigation.gmail_action.confirm"
+CALLBACK_PATH = "/api/method/purchase_approval.gmail_action.confirm"
 TOKEN_DOCTYPE = "PA Gmail Approval Token"
 GMAIL_AUTHORIZED_PARTY = "gmail@system.gserviceaccount.com"
 GMAIL_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/1.0 (KHTML, like Gecko; Gmail Actions)"

@@ -53,7 +53,7 @@ def build(source, output):
     source_data = json.loads(source.read_text(encoding="utf-8"))
     if len(source_data["doctypes"]) != 16 or len(source_data["server_scripts"]) != 48:
         messages = json.loads(
-            (Path(__file__).parents[1] / "purchase_approval_navigation" / "install-messages.json").read_text(encoding="utf-8")
+            (Path(__file__).parents[1] / "purchase_approval" / "install-messages.json").read_text(encoding="utf-8")
         )
         raise ValueError(messages["vi"]["source_count"])
 
@@ -75,7 +75,7 @@ def build(source, output):
     page["standard"] = "Yes"
 
     sidebar = clean(source_data["sidebars"][0], root=True)
-    sidebar["app"] = "purchase_approval_navigation"
+    sidebar["app"] = "purchase_approval"
 
     server_scripts = [clean(item, root=True) for item in source_data["server_scripts"]]
     for script in server_scripts:

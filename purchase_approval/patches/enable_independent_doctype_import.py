@@ -2,7 +2,7 @@
 
 import frappe
 
-from purchase_approval_navigation.install import metadata
+from purchase_approval.install import metadata
 
 
 def execute():

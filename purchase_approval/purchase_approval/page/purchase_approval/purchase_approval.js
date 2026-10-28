@@ -28,7 +28,7 @@ function normalizeLegacyPageUrl(){
   history.replaceState(history.state,'','/desk/purchase-approval'+location.search+location.hash);
 }
 function loadCatalog(){
-  return catalogPromise ||= fetch('/assets/purchase_approval_navigation/ui-translations.json',{credentials:'same-origin',cache:'no-cache'}).then(response=>{if(!response.ok)throw new Error(String(response.status));return response.json();}).then(value=>value.schema_version===1&&value.messages?.vi?{...embeddedCatalog,messages:{vi:{...embeddedCatalog.messages.vi,...value.messages.vi}}}:embeddedCatalog).catch(()=>embeddedCatalog);
+  return catalogPromise ||= fetch('/assets/purchase_approval/ui-translations.json',{credentials:'same-origin',cache:'no-cache'}).then(response=>{if(!response.ok)throw new Error(String(response.status));return response.json();}).then(value=>value.schema_version===1&&value.messages?.vi?{...embeddedCatalog,messages:{vi:{...embeddedCatalog.messages.vi,...value.messages.vi}}}:embeddedCatalog).catch(()=>embeddedCatalog);
 }
 function keepDeskLinksInTab(){
   window.PADeskNavigation?.sync();

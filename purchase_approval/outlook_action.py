@@ -12,7 +12,7 @@ import frappe
 from frappe.utils import add_to_date, get_datetime, now_datetime
 
 
-CALLBACK_PATH = "/api/method/purchase_approval_navigation.outlook_action.confirm"
+CALLBACK_PATH = "/api/method/purchase_approval.outlook_action.confirm"
 TOKEN_DOCTYPE = "PA Outlook Approval Token"
 ACTION_CLIENT_ID = "48af08dc-f6d2-435f-b2a7-069abd99c086"
 _catalog = json.loads(Path(__file__).with_name("ui-translations.json").read_text(encoding="utf-8"))["messages"]
@@ -23,7 +23,7 @@ def _message(key):
 
 
 def _configuration():
-    from purchase_approval_navigation import graph_mail
+    from purchase_approval import graph_mail
     graph = graph_mail._configuration()
     if frappe.conf.get("pa_outlook_actions_enabled") not in (True, 1) or not graph["enabled"]:
         return None

@@ -1,0 +1,28 @@
+{
+  "vi": {
+    "metadata_version": "Phiên bản metadata Purchase Approval không được hỗ trợ.",
+    "missing_doctype": "Thiếu DocType phụ thuộc: {doctype}. Hãy cài factory_management trước.",
+    "missing_server_scripts": "Site chưa bật Server Scripts. Hãy bật trước khi cài Purchase Approval.",
+    "doctype_exists": "DocType {doctype} đã tồn tại ngoài app Purchase Approval; cần kiểm tra trước khi cài.",
+    "source_count": "Số lượng metadata từ site nguồn không đúng như dự kiến.",
+    "slug_both_installed": "Site đang đăng ký đồng thời hai tên app Purchase Approval; cần kiểm tra trước khi chuyển.",
+    "slug_old_missing": "Site không đăng ký app Purchase Approval cũ hoặc mới.",
+    "slug_new_missing": "Bench chưa có app purchase_approval trong apps.txt.",
+    "slug_wrong_module_owner": "Module Purchase Approval đang thuộc app khác: {owner}.",
+    "slug_missing_doctype": "Thiếu DocType Purchase Approval cần giữ lại: {doctype}.",
+    "slug_migrated": "Đã chuyển app Purchase Approval trên site {site}; cập nhật {references} tài liệu chứa đường dẫn cũ."
+  },
+  "en": {
+    "metadata_version": "Unsupported Purchase Approval metadata version.",
+    "missing_doctype": "Required DocType {doctype} is missing. Install factory_management first.",
+    "missing_server_scripts": "Server Scripts are disabled on this site. Enable them before installing Purchase Approval.",
+    "doctype_exists": "DocType {doctype} already exists outside Purchase Approval; review it before installation.",
+    "source_count": "Source-site metadata counts differ from the expected package.",
+    "slug_both_installed": "This site registers both Purchase Approval app names; review it before migration.",
+    "slug_old_missing": "This site has neither Purchase Approval app name installed.",
+    "slug_new_missing": "The bench does not list purchase_approval in apps.txt.",
+    "slug_wrong_module_owner": "The Purchase Approval module belongs to another app: {owner}.",
+    "slug_missing_doctype": "A Purchase Approval DocType that must be preserved is missing: {doctype}.",
+    "slug_migrated": "Migrated Purchase Approval on site {site}; updated {references} documents with old paths."
+  }
+}

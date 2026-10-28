@@ -6,13 +6,13 @@ Tại **PA Settings**, PA Super Admin nhập tenant ID, app ID, hộp thư gửi
 
 1. Dùng một mailbox Exchange Online cố định làm sender. Tạo ứng dụng Entra ID dành riêng cho gửi mail, cấp quyền ứng dụng `Mail.Send`, quản trị viên cấp consent và giới hạn quyền vào mailbox đó bằng Exchange Application RBAC. Tải chứng thư công khai lên ứng dụng. Khóa riêng PEM được tải qua PA Settings trên kết nối HTTPS và Frappe mã hóa trong `__Auth`; giá trị không được trả về giao diện. Sao lưu `encryption_key` của site cùng dữ liệu để còn giải mã sau khi phục hồi.
 2. Tạo ứng dụng Entra ID thứ hai, một tenant, cho callback Outlook. Expose API với `Application ID URI`, đặt `requestedAccessTokenVersion` là 2 và preauthorize Microsoft Actions app `48af08dc-f6d2-435f-b2a7-069abd99c086` cho scope API. Đăng ký provider tại Actionable Email Developer Dashboard với sender, target domain HTTPS và ứng dụng Entra này. Bắt đầu bằng phạm vi Test Users, sau đó Organization.
-3. Công khai callback bằng hostname DNS và TLS hợp lệ. Callback là `https://<host>/api/method/purchase_approval_navigation.outlook_action.confirm`. Proxy chỉ cho POST đến endpoint; chuyển header `Action-Authorization` sang `X-PA-Outlook-Authorization`, xóa `Authorization` trước khi đến Frappe. Giữ query/body và Host gốc.
+3. Công khai callback bằng hostname DNS và TLS hợp lệ. Callback là `https://<host>/api/method/purchase_approval.outlook_action.confirm`. Proxy chỉ cho POST đến endpoint; chuyển header `Action-Authorization` sang `X-PA-Outlook-Authorization`, xóa `Authorization` trước khi đến Frappe. Giữ query/body và Host gốc.
 4. Cài module app và các dependency từ `pyproject.toml` trong backend và worker. Cài DocType `PA Outlook Approval Token`, các Server Script, Client Script và catalog mới bằng `deploy-outlook.py` sau khi sao lưu.
 
 Ví dụ cấu hình reverse proxy cho callback:
 
 ```nginx
-location = /api/method/purchase_approval_navigation.outlook_action.confirm {
+location = /api/method/purchase_approval.outlook_action.confirm {
     limit_except POST { deny all; }
     access_log off;
     proxy_set_header X-PA-Outlook-Authorization $http_action_authorization;
@@ -27,7 +27,7 @@ Graph được cấu hình trong PA Settings; khi chưa có HTTPS hoặc backend
 ```json
 {
   "pa_outlook_actions_enabled": false,
-  "pa_outlook_callback_url": "https://approval.example.com/api/method/purchase_approval_navigation.outlook_action.confirm",
+  "pa_outlook_callback_url": "https://approval.example.com/api/method/purchase_approval.outlook_action.confirm",
   "pa_outlook_registered_sender": "approval@example.com",
   "pa_outlook_originator": "<provider-guid>",
   "pa_outlook_tenant_id": "<tenant-guid>",

@@ -50,7 +50,7 @@ def status():
     if not frappe.flags.get("in_safe_exec"):
         frappe.throw(_message("error.permission"), frappe.PermissionError)
     config = _configuration()
-    from purchase_approval_navigation import outlook_action
+    from purchase_approval import outlook_action
     smtp_account = frappe.db.get_single_value(SETTINGS_DOCTYPE, "outgoing_email_account")
     if not smtp_account:
         smtp_account = frappe.db.get_value("Email Account", {"enable_outgoing": 1, "default_outgoing": 1}, "name")
