@@ -22,6 +22,7 @@ purchase_approval_navigation = [
     "*.txt",
     "*.json",
     "metadata/*.json",
+    "public/*.json",
     "public/js/*.js",
     "public/css/*.css",
     "public/images/*.svg",
