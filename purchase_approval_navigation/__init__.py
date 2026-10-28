@@ -7,3 +7,5 @@ from purchase_approval import *  # noqa: F401, F403
 from purchase_approval import __version__  # noqa: F401
 
 app_name = "purchase_approval_navigation"
+
+__all__ = [name for name in dir() if not name.startswith("_")]
