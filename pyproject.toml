@@ -32,4 +32,7 @@ purchase_approval = [
 ]
 purchase_approval_navigation = [
     "*.txt",
+    "purchase_approval/page/purchase_approval/*.json",
+    "purchase_approval/page/purchase_approval/*.js",
+    "purchase_approval/page/purchase_approval/*.css",
 ]
