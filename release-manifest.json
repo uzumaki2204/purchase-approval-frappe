@@ -1,0 +1,17 @@
+{
+  "app": "purchase_approval_navigation",
+  "version": "1.1.0",
+  "branch": "version-16",
+  "tag": "v1.1.0",
+  "code_commit": "2d47e9ba53dac46502accdd9d52e7ac18fa1bf90",
+  "frappe": ">=16.53.0,<17.0.0",
+  "factory_management": ">=0.1.29,<0.2.0",
+  "metadata_sha256": "7ead54dbcfa4527e76f68efe0bd399dc7d2dd10afb74fc4d0a0fbc49ee9bd302",
+  "metadata_counts": {
+    "doctypes": 16,
+    "roles": 7,
+    "server_scripts": 48,
+    "client_scripts": 3,
+    "translations": 511
+  }
+}
