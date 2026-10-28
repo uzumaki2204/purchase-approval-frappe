@@ -20,6 +20,8 @@ App tạo metadata mặc định gồm 16 DocType, Page, Sidebar, 7 Role, 48 Ser
 
 Metadata được ghi trong `purchase_approval_navigation/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.
 
+Từ bản 1.1.1, cả 10 DocType Purchase Approval độc lập đều hỗ trợ Data Import bằng Excel (`.xlsx`) hoặc CSV. Role `PA Super Admin` có quyền Import, Create và Write cho các DocType này; Administrator cũng có thể import. Năm bảng con được import qua file của DocType cha. `PA Settings` là DocType Single nên chỉnh trực tiếp trong form. Khi nâng cấp site đã cài, chạy `bench --site <ten-site> migrate` để áp dụng patch một lần. Với token, lịch sử và đơn mua hàng, file import phải có đủ liên kết và dữ liệu hợp lệ; thao tác import có thể tạo bản ghi ngoài quy trình phê duyệt thông thường.
+
 ## Phát hành
 
 Mã chuẩn nằm trong `integrations/frappe/purchase-approval-navigation` của repo FactoryManagement. Khi phát hành, xuất đúng thư mục này sang repo app, kiểm tra commit và gắn tag. `tools/package_source.py` chuyển bản export metadata đọc từ site nguồn thành JSON đã bỏ thông tin audit và dữ liệu nghiệp vụ; không commit bản export thô.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "purchase-approval-navigation"
-version = "1.1.0"
+version = "1.1.1"
 description = "Purchase Approval app for Frappe 16"
 requires-python = ">=3.14"
 dependencies = ["msal>=1.31,<2", "PyJWT[crypto]>=2.9,<3", "requests>=2.31,<3"]
