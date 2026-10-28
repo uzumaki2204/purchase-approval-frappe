@@ -1,0 +1,6 @@
+body.pa-only-sidebar #desk-dock{display:none!important}
+body.pa-only-sidebar .body-sidebar .sidebar-item-container.pa-role-hidden{display:none!important}
+body.pa-only-sidebar .body-sidebar-bottom .pa-sidebar-logout{margin:0 0 2px}
+body.pa-only-sidebar .body-sidebar-bottom .pa-sidebar-logout .item-anchor{width:100%;border:0;background:transparent;font:inherit;text-align:left;cursor:pointer}
+body.pa-only-sidebar .body-sidebar-bottom .pa-sidebar-logout .item-anchor:hover{background:var(--subtle-fg)}
+body.pa-only-sidebar .body-sidebar-bottom .pa-sidebar-logout .item-anchor:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}

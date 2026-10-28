@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "purchase-approval-navigation"
+version = "1.1.0"
+description = "Purchase Approval app for Frappe 16"
+requires-python = ">=3.14"
+dependencies = ["msal>=1.31,<2", "PyJWT[crypto]>=2.9,<3", "requests>=2.31,<3"]
+
+[tool.bench.frappe-dependencies]
+frappe = ">=16.53.0,<17.0.0"
+factory_management = ">=0.1.29,<0.2.0"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["purchase_approval_navigation*"]
+
+[tool.setuptools.package-data]
+purchase_approval_navigation = [
+    "*.txt",
+    "*.json",
+    "metadata/*.json",
+    "public/js/*.js",
+    "public/css/*.css",
+    "public/images/*.svg",
+    "purchase_approval/page/purchase_approval/*.json",
+    "purchase_approval/page/purchase_approval/*.js",
+    "purchase_approval/page/purchase_approval/*.css",
+]

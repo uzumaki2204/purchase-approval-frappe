@@ -1,0 +1,52 @@
+{
+  "name": "purchase-approval",
+  "idx": 1,
+  "system_page": 0,
+  "page_name": "purchase-approval",
+  "title": "Phê duyệt đề nghị mua hàng",
+  "icon": null,
+  "module": "Purchase Approval",
+  "restrict_to_domain": null,
+  "standard": "Yes",
+  "doctype": "Page",
+  "roles": [
+    {
+      "idx": 1,
+      "role": "PA Requester",
+      "doctype": "Has Role"
+    },
+    {
+      "idx": 2,
+      "role": "PA Manager",
+      "doctype": "Has Role"
+    },
+    {
+      "idx": 3,
+      "role": "PA Purchasing",
+      "doctype": "Has Role"
+    },
+    {
+      "idx": 4,
+      "role": "PA Approver",
+      "doctype": "Has Role"
+    },
+    {
+      "idx": 5,
+      "role": "PA Receiver",
+      "doctype": "Has Role"
+    },
+    {
+      "idx": 6,
+      "role": "PA Company Admin",
+      "doctype": "Has Role"
+    },
+    {
+      "idx": 7,
+      "role": "PA Super Admin",
+      "doctype": "Has Role"
+    }
+  ],
+  "script": null,
+  "style": null,
+  "content": null
+}

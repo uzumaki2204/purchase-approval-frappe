@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Purchase Approval">
+  <rect x="2" y="2" width="60" height="60" rx="8" fill="#1b5b82"/>
+  <path d="M18 12h20l9 9v26H18z" fill="#fff"/>
+  <path d="M38 12v10h9" fill="#dcecf5"/>
+  <path d="M24 29h16M24 35h12" fill="none" stroke="#1b5b82" stroke-linecap="round" stroke-width="3"/>
+  <circle cx="43" cy="46" r="10" fill="#237557"/>
+  <path d="m38.5 46 3 3 6-6.5" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8"/>
+</svg>

@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.venv/
+site_config.json
+*_database.sql*
+*_files.tgz
+*_private-files.tgz
+*source_export*.json
