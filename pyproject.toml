@@ -15,7 +15,7 @@ factory_management = ">=0.1.29,<0.2.0"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["purchase_approval*"]
+include = ["purchase_approval*", "purchase_approval_navigation*"]
 
 [tool.setuptools.package-data]
 purchase_approval = [
