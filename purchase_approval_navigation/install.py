@@ -74,8 +74,19 @@ def ensure_doctypes(payload):
 
 def ensure_named_docs(doctype, values):
     for item in values:
+        if doctype == "Server Script" and item["name"] == "pa_scope_query_size":
+            item = adapt_size_permission_query(item)
         if not frappe.db.exists(doctype, item["name"]):
             frappe.get_doc(item).insert(ignore_permissions=True)
+
+
+def adapt_size_permission_query(source):
+    if frappe.db.exists("DocType", "Size") or not frappe.db.exists("DocType", "ProductSize"):
+        return source
+    item = dict(source)
+    item["reference_doctype"] = "ProductSize"
+    item["script"] = source["script"].replace("'Size'", "'ProductSize'").replace("`tabSize`", "`tabProductSize`")
+    return item
 
 
 def ensure_permissions(payload):
