@@ -52,7 +52,10 @@ def merge_fields(doctype, custom_fields, field_order):
 def build(source, output):
     source_data = json.loads(source.read_text(encoding="utf-8"))
     if len(source_data["doctypes"]) != 16 or len(source_data["server_scripts"]) != 48:
-        raise ValueError("Unexpected source metadata count")
+        messages = json.loads(
+            (Path(__file__).parents[1] / "purchase_approval_navigation" / "install-messages.json").read_text(encoding="utf-8")
+        )
+        raise ValueError(messages["vi"]["source_count"])
 
     order_by_doctype = {}
     for setter in source_data["property_setters"]:
