@@ -686,7 +686,43 @@ const PAApp = (() => {
     const summary=n('div',null,{class:'pa-doc-summary'}),summaryRow=(key,value,grand=false)=>{const row=n('div',null,{class:'pa-doc-summary-row'+(grand?' pa-grand-total':'')});row.append(n('span',t(key)),n('strong',value));return row;};
     if(priced)summary.append(summaryRow('field.final_subtotal',money(r.final_subtotal)+' '+r.currency),summaryRow('field.final_tax',money(r.final_tax)+' '+r.currency));
     summary.append(summaryRow(priced?'field.final_total':'field.estimated_total',money(priced?r.final_total:r.estimated_total)+' '+r.currency,true));paper.append(summary);paper.hidden=true;main.append(pdfViewer,paper);
-    const pdfEpoch=epoch;void(async()=>{try{const response=await fetch('/api/method/pa_get_purchase_request_pdf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Frappe-CSRF-Token':frappe.csrf_token||''},body:new URLSearchParams({payload:JSON.stringify({name:r.name})})});if(!response.ok||!(response.headers.get('content-type')||'').toLowerCase().includes('application/pdf'))throw new Error(t('error.server'));const blob=await response.blob();if(pdfEpoch!==epoch)return;activePdfUrl=URL.createObjectURL(blob);pdfFrame.src=activePdfUrl;pdfFrame.hidden=false;pdfStatus.hidden=true;download.disabled=false;}catch(e){if(pdfEpoch!==epoch)return;pdfStatus.textContent=t('error.server');pdfStatus.classList.add('pa-pdf-error');}})();
+    const pdfEpoch=epoch;
+    let retryPdf;
+    const loadPdf=async()=>{
+      if(pdfEpoch!==epoch)return;
+      download.disabled=true;
+      retryPdf.hidden=true;
+      pdfStatus.classList.remove('pa-pdf-error');
+      pdfStatus.textContent=t('common.loading');
+      pdfStatus.append(retryPdf);
+      pdfStatus.hidden=false;
+      pdfFrame.hidden=true;
+      pdfFrame.removeAttribute('src');
+      if(activePdfUrl){URL.revokeObjectURL(activePdfUrl);activePdfUrl='';}
+      try{
+        const response=await fetch('/api/method/pa_get_purchase_request_pdf',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8','X-Frappe-CSRF-Token':frappe.csrf_token||''},body:new URLSearchParams({payload:JSON.stringify({name:r.name})})});
+        const contentType=(response.headers.get('content-type')||'').split(';',1)[0].trim().toLowerCase();
+        if(!response.ok||contentType!=='application/pdf')throw new Error(t('error.server'));
+        const blob=await response.blob();
+        if(blob.size<5||await blob.slice(0,5).text()!=='%PDF-')throw new Error(t('error.server'));
+        if(pdfEpoch!==epoch)return;
+        activePdfUrl=URL.createObjectURL(blob);
+        pdfFrame.src=activePdfUrl;
+        pdfFrame.hidden=false;
+        pdfStatus.hidden=true;
+        download.disabled=false;
+      }catch(error){
+        if(pdfEpoch!==epoch)return;
+        pdfStatus.textContent=t('error.server');
+        pdfStatus.append(retryPdf);
+        retryPdf.hidden=false;
+        pdfStatus.classList.add('pa-pdf-error');
+      }
+    };
+    retryPdf=btn('action.refresh',loadPdf);
+    retryPdf.hidden=true;
+    pdfStatus.append(retryPdf);
+    void loadPdf();
     main.append(panel('common.price_history',renderPriceHistory(result.price_history)));
     main.append(panel('common.history',result.history.length?table(['field.acted_at','field.action','field.actor_name','field.comment'],result.history.map(h=>[S.time(h.creation),t('history.'+h.action),h.actor_name,h.comment])):empty('common.no_activity')));
     const routeBody=n('div',null,{class:'pa-panel-body'});for(const instance of result.instances){routeBody.append(n('h3',t('field.revision')+' '+instance.revision));for(const step of instance.steps){const row=n('div',null,{class:'pa-workflow-step','data-state':step.status});row.append(n('strong',step.step_order+'. '+step.step_name),badge(step.status),n('p',t('mode.'+step.approval_method)));for(const assigned of instance.assignees.filter(a=>a.step_order===step.step_order)){const person=n('p');person.append(n('span',labels.users?.[assigned.user]||assigned.user),n('span',' · '+t('status.'+assigned.status)));row.append(person);}routeBody.append(row);}}if(!result.instances.length)routeBody.append(empty('common.no_data'));const route=panel('common.approval_steps',routeBody);route.classList.add('pa-route-panel');columns.append(main,route);mount.append(columns);

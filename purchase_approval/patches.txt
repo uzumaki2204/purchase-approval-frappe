@@ -2,3 +2,4 @@
 
 [post_model_sync]
 purchase_approval.patches.enable_independent_doctype_import
+purchase_approval.patches.fix_purchase_request_print_format_company_doctype
