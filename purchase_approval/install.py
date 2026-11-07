@@ -10,6 +10,7 @@ ROOT = Path(__file__).parent
 METADATA = ROOT / "metadata" / "purchase_approval.json"
 MESSAGES = ROOT / "install-messages.json"
 EXTERNAL_DOCTYPES = ("Company", "Department", "Product", "User", "Role")
+PURCHASE_APPROVAL_MODULES = ("Purchase Approval", "Purchase Approval (Custom)")
 
 
 def message(key, **values):
@@ -47,7 +48,8 @@ def ensure_doctypes(payload):
     for values in payload["doctypes"]:
         name = values["name"]
         if frappe.db.exists("DocType", name):
-            if frappe.db.get_value("DocType", name, "module") != "Purchase Approval":
+            module = frappe.db.get_value("DocType", name, "module")
+            if module not in PURCHASE_APPROVAL_MODULES:
                 frappe.throw(message("doctype_exists", doctype=name))
             continue
         frappe.get_doc({
