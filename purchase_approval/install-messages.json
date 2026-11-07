@@ -11,7 +11,7 @@
     "slug_wrong_module_owner": "Module Purchase Approval đang thuộc app khác: {owner}.",
     "slug_missing_doctype": "Thiếu DocType Purchase Approval cần giữ lại: {doctype}.",
     "slug_migrated": "Đã chuyển app Purchase Approval trên site {site}; cập nhật {references} tài liệu chứa đường dẫn cũ.",
-    "workflow_script_conflict": "Script {script} ?? ???c ch?nh s?a ri?ng; migration d?ng ?? tr?nh ghi ?? m? n?y."
+    "workflow_script_conflict": "Script {script} đã được chỉnh sửa riêng; bản vá dừng để tránh ghi đè mã này."
   },
   "en": {
     "metadata_version": "Unsupported Purchase Approval metadata version.",

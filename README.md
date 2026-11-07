@@ -20,6 +20,8 @@ App tạo metadata mặc định gồm 16 DocType, Page, Sidebar, 8 Role, 50 Ser
 
 Từ v2.0.8, mỗi quy trình có thể cấu hình thứ tự các bước kiểm tra kho, bàn giao đề nghị mua, báo giá, duyệt báo giá và nhận hàng. Người xử lý được gán bằng User hoặc Role; mỗi bước có cờ email riêng. Người tạo vẫn lập và gửi phiếu. Nếu chỉ một quy trình phù hợp, hệ thống chọn tự động; nếu nhiều quy trình phù hợp, phiếu chờ người được cấu hình chọn. Sau khi nâng cấp, các quy trình cũ có chuỗi bước mặc định và các bước duyệt đang chạy giữ nguyên snapshot. Quản trị viên cần gán thành viên cho Role `PA Stock Checker` trước khi gửi phiếu mới theo quy trình đã chuyển đổi.
 
+v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
+
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.
 
 ## Chuyển site đã cài tên app cũ

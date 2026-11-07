@@ -1,6 +1,7 @@
 """Checks for workflow ordering, automatic handoff and assignment boundaries."""
 
 import importlib.util
+import json
 import sys
 import types
 import unittest
@@ -39,6 +40,20 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ) as validate:
             runtime.bridge("validate_steps", steps=[{"step_type": "Stock Check"}], payload="ignored")
         validate.assert_called_once()
+
+    def test_migration_accepts_only_installer_size_variant(self):
+        payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))
+        source = next(row["script"] for row in payload["server_scripts"] if row["name"] == "pa_scope_query_size")
+        adapted = source.replace("'Size'", "'ProductSize'").replace("`tabSize`", "`tabProductSize`")
+        with patch.object(migration.frappe.db, "exists", side_effect=lambda _doctype, name: name == "pa_scope_query_size", create=True), patch.object(
+            migration.frappe.db, "get_value", return_value=adapted, create=True
+        ), patch.object(migration, "message", return_value="conflict"):
+            self.assertEqual(migration.script_updates(payload), [])
+        with patch.object(migration.frappe.db, "exists", side_effect=lambda _doctype, name: name == "pa_scope_query_size", create=True), patch.object(
+            migration.frappe.db, "get_value", return_value="custom script", create=True
+        ), patch.object(migration, "message", return_value="conflict"):
+            with self.assertRaises(ValueError):
+                migration.script_updates(payload)
 
     def test_rejects_invalid_step_orders(self):
         valid = [{"step_type": "Quotation", "approver_source": "Role", "approval_method": "Any"},

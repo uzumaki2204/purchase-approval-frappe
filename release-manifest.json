@@ -1,9 +1,9 @@
 {
   "app": "purchase_approval",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "branch": "version-16",
-  "tag": "v2.0.8",
-  "code_commit": "2c9630dcc8082409126567f77c9fc3fb1e29215c",
+  "tag": "v2.0.9",
+  "code_commit": "5ad0fa88228ae4bca7f56da3f220ba0834e23acf",
   "frappe": ">=16.53.0,<17.0.0",
   "factory_management": ">=0.1.29,<0.2.0",
   "metadata_sha256": "188d56f6ee6beade06a457a4392a831d85cac641938e56958610481f20d57539",

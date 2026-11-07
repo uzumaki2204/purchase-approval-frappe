@@ -10,6 +10,7 @@ from purchase_approval.install import message, metadata
 
 
 HASHES = json.loads(Path(__file__).with_name("v207_script_hashes.json").read_text(encoding="utf-8"))
+ADAPTED_SIZE_SCRIPT_SHA256 = "3d36ce2283827c65648d1ae351abcd8661d9abe1913b9682287a1a9d62f4096b"
 FIELD_DOCTYPES = (
     "PA Purchase Request",
     "PA Approval Workflow",
@@ -38,12 +39,21 @@ def script_updates(payload):
                 continue
             current = frappe.db.get_value(doctype, name, "script") or ""
             target = targets.get(name)
-            if target is None or digest(current) == digest(target):
+            if target is None:
                 continue
-            if digest(current) != old_hash:
+            accepted = {old_hash: target}
+            if name == "pa_scope_query_size":
+                # install.adapt_size_permission_query creates this exact variant
+                # on sites with ProductSize instead of Size.
+                adapted = target.replace("'Size'", "'ProductSize'").replace("`tabSize`", "`tabProductSize`")
+                accepted[ADAPTED_SIZE_SCRIPT_SHA256] = adapted
+            current_hash = digest(current)
+            if current_hash == digest(accepted.get(current_hash, target)):
+                continue
+            if current_hash not in accepted:
                 conflicts.append(f"{doctype} {name}")
             else:
-                pending.append((doctype, name, target))
+                pending.append((doctype, name, accepted[current_hash]))
     if conflicts:
         frappe.throw(message("workflow_script_conflict", script=", ".join(conflicts)))
     return pending
