@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "purchase_approval"
-version = "2.0.7"
+version = "2.0.8"
 description = "Purchase Approval app for Frappe 16"
 requires-python = ">=3.14"
 dependencies = ["msal>=1.31,<2", "PyJWT[crypto]>=2.9,<3", "requests>=2.31,<3"]
@@ -22,6 +22,7 @@ purchase_approval = [
     "*.txt",
     "*.json",
     "metadata/*.json",
+    "patches/*.json",
     "public/*.json",
     "public/js/*.js",
     "public/css/*.css",
