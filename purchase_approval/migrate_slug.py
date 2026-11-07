@@ -56,7 +56,7 @@ def execute():
         frappe.throw(message("slug_new_missing"))
 
     owner = frappe.db.get_value("Module Def", MODULE, "app_name")
-    if owner not in (OLD_APP, NEW_APP):
+    if owner not in (None, "", OLD_APP, NEW_APP):
         frappe.throw(message("slug_wrong_module_owner", owner=owner or ""))
     for values in metadata()["doctypes"]:
         if not frappe.db.exists("DocType", values["name"]):
@@ -73,7 +73,7 @@ def execute():
             ignore_permissions=True
         )
 
-    if owner == OLD_APP:
+    if owner != NEW_APP:
         frappe.db.set_value("Module Def", MODULE, "app_name", NEW_APP, update_modified=False)
     frappe.db.commit()
 
