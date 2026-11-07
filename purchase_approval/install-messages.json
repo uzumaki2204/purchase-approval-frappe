@@ -10,7 +10,8 @@
     "slug_new_missing": "Bench chưa có app purchase_approval trong apps.txt.",
     "slug_wrong_module_owner": "Module Purchase Approval đang thuộc app khác: {owner}.",
     "slug_missing_doctype": "Thiếu DocType Purchase Approval cần giữ lại: {doctype}.",
-    "slug_migrated": "Đã chuyển app Purchase Approval trên site {site}; cập nhật {references} tài liệu chứa đường dẫn cũ."
+    "slug_migrated": "Đã chuyển app Purchase Approval trên site {site}; cập nhật {references} tài liệu chứa đường dẫn cũ.",
+    "workflow_script_conflict": "Script {script} ?? ???c ch?nh s?a ri?ng; migration d?ng ?? tr?nh ghi ?? m? n?y."
   },
   "en": {
     "metadata_version": "Unsupported Purchase Approval metadata version.",
@@ -23,6 +24,7 @@
     "slug_new_missing": "The bench does not list purchase_approval in apps.txt.",
     "slug_wrong_module_owner": "The Purchase Approval module belongs to another app: {owner}.",
     "slug_missing_doctype": "A Purchase Approval DocType that must be preserved is missing: {doctype}.",
-    "slug_migrated": "Migrated Purchase Approval on site {site}; updated {references} documents with old paths."
+    "slug_migrated": "Migrated Purchase Approval on site {site}; updated {references} documents with old paths.",
+    "workflow_script_conflict": "Managed script {script} has local changes; the migration stopped to avoid overwriting it."
   }
 }
