@@ -1,6 +1,9 @@
 """Add multi-user workflow assignees and preserve existing approval snapshots."""
 
+import difflib
 import hashlib
+import json
+from pathlib import Path
 
 import frappe
 
@@ -26,6 +29,78 @@ UPDATED_TRANSLATIONS = {
 
 def digest(source):
     return hashlib.sha256((source or "").encode("utf-8")).hexdigest()
+
+
+def script_lines(source):
+    return (source or "").replace("\r\n", "\n").replace("\r", "\n").splitlines()
+
+
+def script_edits(before, after):
+    matcher = difflib.SequenceMatcher(None, before, after)
+    return [opcode for opcode in matcher.get_opcodes() if opcode[0] != "equal"]
+
+
+def edits_overlap(left, right):
+    left_start, left_end = left[1], left[2]
+    right_start, right_end = right[1], right[2]
+    if left_start == left_end and right_start == right_end:
+        return left_start == right_start
+    if left_start == left_end:
+        return right_start <= left_start <= right_end
+    if right_start == right_end:
+        return left_start <= right_start <= left_end
+    return max(left_start, right_start) < min(left_end, right_end)
+
+
+def merge_managed_script(base_source, target_source, current_source):
+    """Apply app changes over local edits when the changed lines do not overlap."""
+    base = script_lines(base_source)
+    target = script_lines(target_source)
+    current = script_lines(current_source)
+    if current == target:
+        return current_source
+    if current == base:
+        return target_source
+
+    local_edits = script_edits(base, current)
+    target_edits = script_edits(base, target)
+    pending = []
+
+    def shift_before(index):
+        shift = 0
+        for _tag, start, end, new_start, new_end in local_edits:
+            if end < index or (end == index and start < end):
+                shift += (new_end - new_start) - (end - start)
+        return shift
+
+    for change in target_edits:
+        _tag, start, end, target_start, target_end = change
+        replacement = target[target_start:target_end]
+        overlaps = [local for local in local_edits if edits_overlap(change, local)]
+        if overlaps:
+            if len(overlaps) == 1:
+                _local_tag, local_start, local_end, current_start, current_end = overlaps[0]
+                if local_start == start and local_end == end and current[current_start:current_end] == replacement:
+                    continue
+            return None
+
+        current_start = start + shift_before(start)
+        current_end = end + shift_before(end)
+        pending.append((current_start, current_end, replacement))
+
+    merged = current[:]
+    for start, end, replacement in sorted(pending, key=lambda row: row[0], reverse=True):
+        merged[start:end] = replacement
+
+    if current_source.endswith("\r\n"):
+        newline, ending = "\r\n", "\r\n"
+    elif current_source.endswith("\n"):
+        newline, ending = "\n", "\n"
+    elif current_source.endswith("\r"):
+        newline, ending = "\r", "\r"
+    else:
+        newline, ending = "\n", ""
+    return newline.join(merged) + ending
 
 
 def ensure_child_doctype(payload):
@@ -105,6 +180,7 @@ def backfill_workflows():
 
 def update_server_scripts(payload):
     targets = {row["name"]: row["script"] for row in payload["server_scripts"]}
+    baselines = json.loads(Path(__file__).with_name("multi_user_workflow_base.json").read_text(encoding="utf-8"))
     pending = []
     conflicts = []
     for name, old_hash in OLD_SERVER_SCRIPT_SHA256.items():
@@ -112,13 +188,14 @@ def update_server_scripts(payload):
             continue
         current = frappe.db.get_value("Server Script", name, "script") or ""
         target = targets[name]
-        current_hash = digest(current)
-        if current_hash == digest(target):
-            continue
-        if current_hash != old_hash:
+        baseline = baselines[name]
+        if digest(baseline) != old_hash:
+            frappe.throw(message("workflow_script_conflict", script=name))
+        merged = merge_managed_script(baseline, target, current)
+        if merged is None:
             conflicts.append(f"Server Script {name}")
-        else:
-            pending.append((name, target))
+        elif script_lines(merged) != script_lines(current):
+            pending.append((name, merged))
     if conflicts:
         frappe.throw(message("workflow_script_conflict", script=", ".join(conflicts)))
     for name, source in pending:

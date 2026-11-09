@@ -22,6 +22,8 @@ Từ v2.0.8, mỗi quy trình có thể cấu hình thứ tự các bước ki�
 
 Từ v2.0.10, mỗi bước có thể gán nhiều User và chọn `Any` hoặc `All`; Báo giá luôn do một người hoàn tất. Bàn giao đề nghị mua cần người được giao xác nhận. Các phiên duyệt đang chạy giữ nguyên người xử lý đã chụp trước đó.
 
+Từ v2.0.11, patch cập nhật Server Script hòa trộn thay đổi không trùng với phần nâng cấp. Nếu site và app cùng sửa một đoạn mã, migrate dừng để tránh ghi đè tùy chỉnh đó.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

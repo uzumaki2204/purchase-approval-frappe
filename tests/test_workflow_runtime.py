@@ -281,6 +281,54 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertFalse(any(row["fieldname"] == "approver_users" for row in step["fields"]))
         self.assertEqual({row["fieldname"] for row in assignment["fields"]}, {"step_order", "user"})
 
+    def test_multi_user_migration_merges_non_overlapping_script_edits(self):
+        base = 'def managed():\n    return "old"\n\ndef custom():\n    return "default"\n'
+        target = base.replace('return "old"', 'return "new"')
+        current = base.replace('return "default"', 'return "site"') + "# local footer\n"
+        merged = multi_user_migration.merge_managed_script(base, target, current)
+        self.assertIn('return "new"', merged)
+        self.assertIn('return "site"', merged)
+        self.assertIn("# local footer", merged)
+
+    def test_multi_user_migration_rejects_overlapping_script_edits(self):
+        base = 'def managed():\n    return "old"\n'
+        target = base.replace('return "old"', 'return "new"')
+        current = base.replace('return "old"', 'return "site"')
+        self.assertIsNone(multi_user_migration.merge_managed_script(base, target, current))
+
+    def test_multi_user_migration_baselines_match_v209_script_hashes(self):
+        import hashlib
+
+        baseline = json.loads((path.parent / "patches" / "multi_user_workflow_base.json").read_text(encoding="utf-8"))
+        for name, expected in multi_user_migration.OLD_SERVER_SCRIPT_SHA256.items():
+            self.assertEqual(hashlib.sha256(baseline[name].encode("utf-8")).hexdigest(), expected)
+
+    def test_multi_user_migration_updates_conflicted_scripts_without_losing_other_edits(self):
+        payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))
+        baseline = json.loads((path.parent / "patches" / "multi_user_workflow_base.json").read_text(encoding="utf-8"))
+        names = set(multi_user_migration.OLD_SERVER_SCRIPT_SHA256)
+        current = {
+            name: source.replace(
+                "# All business writes use the request lock and Frappe's POST transaction.",
+                "# All business writes use the request lock and Frappe's POST transaction. Site customization.",
+            )
+            for name, source in baseline.items()
+        }
+        updated = []
+        with patch.object(multi_user_migration.frappe.db, "exists", side_effect=lambda _doctype, name: name in names, create=True), patch.object(
+            multi_user_migration.frappe.db,
+            "get_value",
+            side_effect=lambda _doctype, name, *_args, **_kwargs: current[name],
+            create=True,
+        ), patch.object(multi_user_migration.frappe.db, "set_value", side_effect=lambda _doctype, name, field, source, **_kwargs: updated.append((name, source)), create=True):
+            multi_user_migration.update_server_scripts(payload)
+        self.assertEqual({name for name, _source in updated}, names)
+        for name, source in updated:
+            self.assertIn("Site customization.", source)
+        self.assertIn("for assigned in doc.assignees:", dict(updated)["pa_get_approval_workflow"])
+        self.assertIn("normalize_workflow_users", dict(updated)["pa_save_approval_workflow"])
+        self.assertIn("if completed:", dict(updated)["pa_receive_purchase_request"])
+
 
 if __name__ == "__main__":
     unittest.main()
