@@ -24,6 +24,7 @@ spec.loader.exec_module(runtime)
 sys.path.insert(0, str(path.parents[1]))
 from purchase_approval.patches import configurable_request_workflow as migration
 from purchase_approval.patches import multi_user_workflow as multi_user_migration
+from purchase_approval.patches import add_workflow_roles_menu as roles_menu_migration
 from purchase_approval import install, workflow_api
 
 
@@ -35,6 +36,27 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_roles_menu_patch_adds_only_one_item_after_workflows(self):
+        items = [types.SimpleNamespace(url=roles_menu_migration.WORKFLOW_URL, idx=1),
+                 types.SimpleNamespace(url="/desk/purchase-approval?view=settings", idx=2)]
+        sidebar = types.SimpleNamespace(items=items)
+        def append(_field, values):
+            row = types.SimpleNamespace(**values)
+            items.append(row)
+            return row
+        sidebar.append = append
+        saved = []
+        sidebar.save = lambda **kwargs: saved.append(kwargs)
+        with patch.object(roles_menu_migration.frappe.db, "exists", return_value=True, create=True), patch.object(
+            roles_menu_migration.frappe, "get_doc", return_value=sidebar, create=True
+        ), patch.object(roles_menu_migration.frappe, "clear_cache", create=True):
+            roles_menu_migration.execute()
+            roles_menu_migration.execute()
+        self.assertEqual([row.url for row in items], [roles_menu_migration.WORKFLOW_URL,
+                         roles_menu_migration.ROLE_URL, "/desk/purchase-approval?view=settings"])
+        self.assertEqual([row.idx for row in items], [1, 2, 3])
+        self.assertEqual(saved, [{"ignore_permissions": True}])
+
     def test_bridge_rejects_direct_http_calls(self):
         with self.assertRaises(ValueError):
             runtime.bridge("capabilities", user="other")

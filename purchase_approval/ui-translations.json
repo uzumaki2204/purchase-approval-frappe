@@ -562,7 +562,10 @@
     "confirm.confirm_handoff": "Xác nhận bàn giao đề nghị mua?",
     "history.Purchase Handoff": "Xác nhận bàn giao",
     "field.approver_users": "Người xử lý",
-    "workflow.remove_assignee": "Bỏ chọn"
+    "workflow.remove_assignee": "Bỏ chọn",
+    "nav.roles": "Vai trò xử lý",
+    "workflow.role_scope_hint": "Chọn công ty và phòng ban để xác nhận quyền quản trị. Role được tạo cho toàn site.",
+    "roles.created_assign": "Đã tạo Role {role}. Hãy gán Role cho User đang hoạt động và đủ phạm vi trong màn hình User."
   },
   "roles": [
     "PA Requester",

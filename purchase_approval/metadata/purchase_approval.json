@@ -14973,6 +14973,29 @@
       },
       {
         "idx": 20,
+        "label": "Vai trò xử lý",
+        "link_type": "URL",
+        "icon": "users",
+        "is_default_module": 0,
+        "type": "Link",
+        "link_to": null,
+        "child": 1,
+        "navigate_to_tab": null,
+        "url": "/desk/purchase-approval?view=roles",
+        "open_in_new_tab": 1,
+        "collapsible": 0,
+        "indent": 0,
+        "keep_closed": 0,
+        "show_arrow": 0,
+        "filters": null,
+        "route_options": null,
+        "hidden": 0,
+        "added": 0,
+        "key": null,
+        "doctype": "Sidebar Item"
+      },
+      {
+        "idx": 21,
         "label": "Hồ sơ quy trình",
         "link_type": "DocType",
         "icon": "list-check",
@@ -14995,7 +15018,7 @@
         "doctype": "Sidebar Item"
       },
       {
-        "idx": 21,
+        "idx": 22,
         "label": "Nhật ký phê duyệt",
         "link_type": "DocType",
         "icon": "clipboard-list",
@@ -15018,7 +15041,7 @@
         "doctype": "Sidebar Item"
       },
       {
-        "idx": 22,
+        "idx": 23,
         "label": "Thông báo chờ gửi",
         "link_type": "DocType",
         "icon": "send",
@@ -15041,7 +15064,7 @@
         "doctype": "Sidebar Item"
       },
       {
-        "idx": 23,
+        "idx": 24,
         "label": "Bản dịch",
         "link_type": "DocType",
         "icon": "languages",
@@ -15064,7 +15087,7 @@
         "doctype": "Sidebar Item"
       },
       {
-        "idx": 24,
+        "idx": 25,
         "label": "Thiết lập",
         "link_type": "DocType",
         "icon": "settings",
