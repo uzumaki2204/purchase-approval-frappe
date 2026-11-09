@@ -22,12 +22,13 @@ runtime = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runtime)
 sys.path.insert(0, str(path.parents[1]))
 from purchase_approval.patches import configurable_request_workflow as migration
+from purchase_approval.patches import multi_user_workflow as multi_user_migration
 
 
-def step(order, kind, status="Pending", email=0):
+def step(order, kind, status="Pending", email=0, method="Any"):
     return types.SimpleNamespace(
         step_order=order, step_type=kind, status=status, send_email=email,
-        approval_method="Any", completed_at=None,
+        approval_method=method, completed_at=None,
     )
 
 
@@ -71,23 +72,24 @@ class WorkflowRuntimeTests(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 runtime.validate_steps(invalid)
 
-    def test_handoff_advances_without_user_confirmation(self):
+    def test_advance_waits_for_manual_handoff(self):
         request = types.SimpleNamespace(status="Pending Stock Check")
         handoff = step(2, "Purchase Handoff", email=1)
         quotation = step(3, "Quotation")
         instance = types.SimpleNamespace(steps=[step(1, "Stock Check", "Approved"), handoff, quotation],
-                                         assignees=[], current_sequence=1, status="Pending", completed_at=None)
+                                         assignees=[types.SimpleNamespace(step_order=2, user="buyer", status="Pending")],
+                                         current_sequence=1, status="Pending", completed_at=None)
         saved = []
         notices = []
         with patch.object(runtime, "save", side_effect=lambda doc: saved.append(doc)), patch.object(
             runtime, "enqueue", side_effect=lambda *_args: notices.append(True)
         ):
             runtime.advance(request, instance)
-        self.assertEqual(handoff.status, "Approved")
-        self.assertEqual(instance.current_sequence, 3)
+        self.assertEqual(handoff.status, "Pending")
+        self.assertEqual(instance.current_sequence, 2)
         self.assertEqual(request.status, "Pending Purchasing")
         self.assertEqual(len(saved), 2)
-        self.assertEqual(len(notices), 2)
+        self.assertEqual(len(notices), 1)
 
     def test_closes_when_no_steps_remain(self):
         request = types.SimpleNamespace(status="Pending Approval")
@@ -109,6 +111,66 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(runtime, "eligible_user", return_value=True):
             self.assertEqual(runtime.actions(request, "checker"), ["stock_check"])
             self.assertEqual(runtime.actions(request, "other"), [])
+
+    def test_handoff_action_is_limited_to_pending_assignees(self):
+        request = types.SimpleNamespace(status="Pending Purchasing", current_instance="PAI-1")
+        instance = types.SimpleNamespace(steps=[step(2, "Purchase Handoff")], current_sequence=2,
+                                         assignees=[types.SimpleNamespace(user="buyer", step_order=2, status="Pending")])
+        with patch.object(runtime, "is_modern", return_value=True), patch.object(
+            runtime.frappe, "get_doc", return_value=instance, create=True
+        ), patch.object(runtime, "eligible_user", return_value=True):
+            self.assertEqual(runtime.actions(request, "buyer"), ["confirm_handoff"])
+            self.assertEqual(runtime.actions(request, "other"), [])
+
+    def test_user_source_resolves_selected_users_and_legacy_fallback(self):
+        workflow_step = types.SimpleNamespace(approver_source="User", approver_user="legacy", step_type="Stock Check")
+        with patch.object(runtime, "eligible_user", return_value=True):
+            self.assertEqual(runtime.assignees(workflow_step, types.SimpleNamespace(requester="creator"), ["second", "first"]), ["first", "second"])
+            self.assertEqual(runtime.assignees(workflow_step, types.SimpleNamespace(requester="creator")), ["legacy"])
+
+    def test_user_selection_validation_rejects_duplicates_and_out_of_scope_users(self):
+        self.assertEqual(runtime.normalize_workflow_users("User", ["one", "two"], None, ["one", "two"]), ["one", "two"])
+        self.assertEqual(runtime.normalize_workflow_users("User", None, "one", ["one"]), ["one"])
+        self.assertEqual(runtime.normalize_workflow_users("Role", ["ignored"], None, []), [])
+        for selected, allowed in ((["one", "one"], ["one"]), (["outside"], ["one"]), ([], ["one"])):
+            with self.subTest(selected=selected, allowed=allowed), self.assertRaises(ValueError):
+                runtime.normalize_workflow_users("User", selected, None, allowed)
+
+    def test_any_step_completes_after_first_assignee(self):
+        request = types.SimpleNamespace(status="Pending Stock Check")
+        current = step(1, "Stock Check", method="Any")
+        instance = types.SimpleNamespace(name="PAI-1", steps=[current], current_sequence=1, status="Pending",
+                                         assignees=[types.SimpleNamespace(user="one", step_order=1, status="Pending"),
+                                                    types.SimpleNamespace(user="two", step_order=1, status="Pending")])
+        with patch.object(runtime, "eligible_user", return_value=True), patch.object(runtime, "save"), patch.object(
+            runtime, "advance"
+        ) as advance, patch.object(runtime.frappe, "get_all", return_value=[], create=True):
+            self.assertTrue(runtime.finish_step(request, instance, "one", "Checked"))
+        self.assertEqual(current.status, "Approved")
+        self.assertEqual([row.status for row in instance.assignees], ["Approved", "Skipped"])
+        advance.assert_called_once_with(request, instance)
+
+    def test_all_step_waits_for_every_assignee_and_keeps_other_email(self):
+        request = types.SimpleNamespace(status="Pending Stock Check")
+        current = step(1, "Stock Check", method="All")
+        first = types.SimpleNamespace(user="one", step_order=1, status="Pending", acted_at=None, comment=None)
+        second = types.SimpleNamespace(user="two", step_order=1, status="Pending", acted_at=None, comment=None)
+        instance = types.SimpleNamespace(name="PAI-1", steps=[current], current_sequence=1, status="Pending", assignees=[first, second])
+        notices = [types.SimpleNamespace(name="n1", recipient="one"), types.SimpleNamespace(name="n2", recipient="two")]
+        with patch.object(runtime, "eligible_user", return_value=True), patch.object(runtime, "save"), patch.object(
+            runtime, "advance"
+        ) as advance, patch.object(runtime.frappe, "get_all", return_value=notices, create=True), patch.object(
+            runtime.frappe.db, "set_value", create=True
+        ) as set_value:
+            self.assertFalse(runtime.finish_step(request, instance, "one", "Checked"))
+            self.assertEqual(current.status, "Pending")
+            self.assertEqual((first.status, second.status), ("Approved", "Pending"))
+            self.assertEqual([call.args[1] for call in set_value.call_args_list], ["n1"])
+            advance.assert_not_called()
+            self.assertTrue(runtime.finish_step(request, instance, "two", "Confirmed"))
+        self.assertEqual(current.status, "Approved")
+        self.assertEqual((first.status, second.status), ("Approved", "Approved"))
+        advance.assert_called_once_with(request, instance)
 
     def test_step_email_toggle_and_idempotency_key(self):
         request = types.SimpleNamespace(name="PA-1", requester="creator")
@@ -134,6 +196,17 @@ class WorkflowRuntimeTests(unittest.TestCase):
         outbox = types.SimpleNamespace(step_order=2, recipient="buyer")
         self.assertTrue(runtime.notification_active(request, instance, outbox))
         request.status = "Cancelled"
+        self.assertFalse(runtime.notification_active(request, instance, outbox))
+
+    def test_handoff_email_is_active_while_waiting_for_confirmation(self):
+        request = types.SimpleNamespace(status="Pending Purchasing", current_instance="PAI-1", company="C1", department="D1")
+        handoff = step(2, "Purchase Handoff", email=1)
+        instance = types.SimpleNamespace(name="PAI-1", status="Pending", steps=[handoff], current_sequence=2,
+                                         assignees=[types.SimpleNamespace(step_order=2, user="buyer", status="Pending")])
+        outbox = types.SimpleNamespace(step_order=2, recipient="buyer")
+        with patch.object(runtime, "eligible_user", return_value=True):
+            self.assertTrue(runtime.notification_active(request, instance, outbox))
+        instance.current_sequence = 3
         self.assertFalse(runtime.notification_active(request, instance, outbox))
 
     def test_migration_keeps_existing_approval_sequence(self):
@@ -171,6 +244,42 @@ class WorkflowRuntimeTests(unittest.TestCase):
                          [("Manager", "Any", "manager", 1), ("Director", "All", "director", 1)])
         self.assertEqual(workflow.selector_role, "PA Purchasing")
         self.assertEqual(get_all.call_args.args[0], "PA Approval Workflow")
+
+    def test_multi_user_migration_backfills_workflow_assignments_only(self):
+        class Workflow:
+            def __init__(self):
+                self.assignees = []
+                self.steps = [
+                    types.SimpleNamespace(step_order=1, step_type="Stock Check", approval_method="All", approver_source="User", approver_user="checker"),
+                    types.SimpleNamespace(step_order=2, step_type="Quote Approval", approval_method="All", approver_source="User", approver_user="approver"),
+                    types.SimpleNamespace(step_order=3, step_type="Quotation", approval_method="All", approver_source="User", approver_user="buyer"),
+                ]
+                self.saved = 0
+
+            def append(self, fieldname, values):
+                getattr(self, fieldname).append(types.SimpleNamespace(**values))
+
+            def save(self, **_kwargs):
+                self.saved += 1
+
+        workflow = Workflow()
+        with patch.object(multi_user_migration.frappe, "get_all", return_value=[types.SimpleNamespace(name="WF-1")], create=True), patch.object(
+            multi_user_migration.frappe, "get_doc", return_value=workflow, create=True
+        ):
+            multi_user_migration.backfill_workflows()
+            multi_user_migration.backfill_workflows()
+        self.assertEqual([(row.step_order, row.user) for row in workflow.assignees], [(1, "checker"), (2, "approver"), (3, "buyer")])
+        self.assertEqual([row.approval_method for row in workflow.steps], ["Any", "All", "Any"])
+        self.assertEqual(workflow.saved, 1)
+
+    def test_multi_user_metadata_stores_assignments_on_workflow_parent(self):
+        payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))
+        workflow = next(row for row in payload["doctypes"] if row["name"] == "PA Approval Workflow")
+        step = next(row for row in payload["doctypes"] if row["name"] == "PA Approval Workflow Step")
+        assignment = next(row for row in payload["doctypes"] if row["name"] == "PA Approval Workflow Assignee")
+        self.assertEqual(next(row["options"] for row in workflow["fields"] if row["fieldname"] == "assignees"), assignment["name"])
+        self.assertFalse(any(row["fieldname"] == "approver_users" for row in step["fields"]))
+        self.assertEqual({row["fieldname"] for row in assignment["fields"]}, {"step_order", "user"})
 
 
 if __name__ == "__main__":

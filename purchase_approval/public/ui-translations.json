@@ -548,7 +548,12 @@
     "notification.requester_subject": "Đã tiếp nhận đề nghị mua hàng",
     "notification.requester_body": "Đề nghị của bạn đã được tiếp nhận và bắt đầu xử lý.",
     "notification.step_subject": "Đến lượt xử lý đề nghị mua hàng",
-    "notification.step_body": "Bạn được phân công xử lý bước {step} của đề nghị mua hàng."
+    "notification.step_body": "Bạn được phân công xử lý bước {step} của đề nghị mua hàng.",
+    "action.confirm_handoff": "Xác nhận bàn giao",
+    "confirm.confirm_handoff": "Xác nhận bàn giao đề nghị mua?",
+    "history.Purchase Handoff": "Xác nhận bàn giao",
+    "field.approver_users": "Người xử lý",
+    "workflow.remove_assignee": "Bỏ chọn"
   },
   "roles": [
     "PA Requester",

@@ -16,6 +16,7 @@ OUTBOX = "PA Notification Outbox"
 KINDS = ("Stock Check", "Purchase Handoff", "Quotation", "Quote Approval", "Receiving")
 STAGES = {
     "Stock Check": "Pending Stock Check",
+    "Purchase Handoff": "Pending Purchasing",
     "Quotation": "Pending Purchasing",
     "Quote Approval": "Pending Approval",
     "Receiving": "Approved",
@@ -51,10 +52,25 @@ def eligible_user(user, request):
     return bool(user and user != "Guest" and frappe.db.get_value("User", user, "enabled") and in_scope(user, request))
 
 
-def assignees(step, request):
+def normalize_workflow_users(source, selected, legacy_user, allowed_users):
+    if source != "User":
+        return []
+    if selected is None:
+        selected = [legacy_user] if legacy_user else []
+    if not isinstance(selected, list) or not selected:
+        fail("error.workflow_assignee")
+    if any(not isinstance(user, str) or not user.strip() or len(user) > 140 for user in selected):
+        fail("error.workflow_assignee")
+    users = [user.strip() for user in selected]
+    if len(users) != len(set(users)) or any(user not in allowed_users for user in users):
+        fail("error.workflow_assignee")
+    return users
+
+
+def assignees(step, request, selected_users=None):
     source = step.approver_source
     if source == "User":
-        candidates = [step.approver_user]
+        candidates = selected_users or ([step.approver_user] if step.approver_user else [])
     elif source == "Role":
         candidates = [row.parent for row in frappe.get_all("Has Role", filters={"role": step.approver_role, "parenttype": "User"}, fields=["parent"], limit_page_length=0)]
     elif source == "Department Manager":
@@ -147,7 +163,7 @@ def enqueue(request, instance, step=None):
 
 
 def advance(request, instance):
-    """Move through automatic handoff steps until the next assigned action."""
+    """Move to the next pending workflow action."""
     while True:
         pending = sorted((step for step in instance.steps if step.status == "Pending"), key=lambda step: step.step_order)
         if not pending:
@@ -158,11 +174,6 @@ def advance(request, instance):
             break
         step = pending[0]
         instance.current_sequence = step.step_order
-        if step.step_type == "Purchase Handoff":
-            enqueue(request, instance, step)
-            step.status = "Approved"
-            step.completed_at = frappe.utils.now()
-            continue
         request.status = STAGES[step.step_type]
         break
     save(instance)
@@ -179,10 +190,13 @@ def begin(request, workflow, source):
     snapshot = workflow.as_dict()
     snapshot["workflow_schema"] = 2
     instance = frappe.get_doc({"doctype": INSTANCE, "request": request.name, "company": request.company, "department": request.department, "workflow": workflow.name, "workflow_name": workflow.workflow_name, "workflow_version": workflow.modified, "workflow_snapshot": snapshot, "revision": request.revision, "status": "Pending", "steps": [], "assignees": []})
+    selected_by_order = {}
+    for assigned in getattr(workflow, "assignees", []):
+        selected_by_order.setdefault(assigned.step_order, []).append(assigned.user)
     for definition in sorted(workflow.steps, key=lambda row: row.step_order):
         kind = definition.step_type
         instance.append("steps", {"step_order": definition.step_order, "step_name": definition.step_name, "step_type": kind, "approval_method": definition.approval_method or "Any", "send_email": definition.send_email, "status": "Pending"})
-        for user in assignees(definition, request):
+        for user in assignees(definition, request, selected_by_order.get(definition.step_order)):
             instance.append("assignees", {"step_order": definition.step_order, "user": user, "status": "Pending"})
     instance.flags.pa_internal = True
     instance.insert(ignore_permissions=True)
@@ -226,17 +240,28 @@ def finish_step(request, instance, user, comment=""):
     step = active_step(instance)
     if not step or not assigned(instance, user) or not eligible_user(user, request):
         fail("error.permission")
-    step.status = "Approved"
-    step.completed_at = frappe.utils.now()
-    for row in instance.assignees:
-        if row.step_order == step.step_order and row.status == "Pending":
-            row.status = "Approved" if row.user == user else "Skipped"
-            if row.user == user:
-                row.acted_at = frappe.utils.now()
-                row.comment = comment
-    for outbox in frappe.get_all(OUTBOX, filters={"instance": instance.name, "step_order": step.step_order, "status": "Pending"}, fields=["name"], limit_page_length=0):
-        frappe.db.set_value(OUTBOX, outbox.name, "status", "Cancelled", update_modified=False)
+    acted_at = frappe.utils.now()
+    row = next(row for row in instance.assignees if row.step_order == step.step_order and row.user == user and row.status == "Pending")
+    row.status = "Approved"
+    row.acted_at = acted_at
+    row.comment = comment
+    step_rows = [row for row in instance.assignees if row.step_order == step.step_order]
+    complete = step.approval_method != "All" or all(row.status == "Approved" for row in step_rows)
+    if complete:
+        step.status = "Approved"
+        step.completed_at = acted_at
+        for row in step_rows:
+            if row.status == "Pending":
+                row.status = "Skipped"
+    for outbox in frappe.get_all(OUTBOX, filters={"instance": instance.name, "step_order": step.step_order, "status": "Pending"}, fields=["name", "recipient"], limit_page_length=0):
+        if complete or outbox.recipient == user:
+            frappe.db.set_value(OUTBOX, outbox.name, "status", "Cancelled", update_modified=False)
+    if not complete:
+        save(instance)
+        save(request)
+        return False
     advance(request, instance)
+    return True
 
 
 def notification_active(request, instance, outbox):
@@ -246,7 +271,11 @@ def notification_active(request, instance, outbox):
         return outbox.recipient == request.requester
     handoff = next((step for step in instance.steps if step.step_order == outbox.step_order and step.step_type == "Purchase Handoff"), None)
     if handoff:
-        return bool(handoff.send_email and handoff.status == "Approved" and request.status not in ("Cancelled", "Rejected", "Returned") and any(row.user == outbox.recipient and row.step_order == outbox.step_order for row in instance.assignees))
+        if handoff.status == "Approved":
+            # Preserve notifications queued by the previous automatic handoff
+            # behavior for requests already in flight during an upgrade.
+            return bool(handoff.send_email and request.status not in ("Cancelled", "Rejected", "Returned") and any(row.user == outbox.recipient and row.step_order == outbox.step_order for row in instance.assignees))
+        return bool(handoff.send_email and instance.status == "Pending" and handoff.status == "Pending" and instance.current_sequence == handoff.step_order and assigned(instance, outbox.recipient) and eligible_user(outbox.recipient, request))
     step = active_step(instance)
     return bool(instance.status == "Pending" and step and step.step_order == outbox.step_order and step.send_email and assigned(instance, outbox.recipient) and eligible_user(outbox.recipient, request))
 
@@ -266,7 +295,7 @@ def actions(request, user):
     step = active_step(instance)
     if not step or not assigned(instance, user) or not eligible_user(user, request):
         return []
-    return {"Stock Check": ["stock_check"], "Quotation": ["finalize"], "Quote Approval": ["approve", "return", "reject"], "Receiving": ["receive"]}.get(step.step_type, [])
+    return {"Stock Check": ["stock_check"], "Purchase Handoff": ["confirm_handoff"], "Quotation": ["finalize"], "Quote Approval": ["approve", "return", "reject"], "Receiving": ["receive"]}.get(step.step_type, [])
 
 
 def capabilities(user):
@@ -282,7 +311,7 @@ def capabilities(user):
         request = frappe.get_doc(REQUEST, instance.request)
         if not eligible_user(user, request):
             continue
-        key = {"Stock Check": "stock_check", "Quotation": "purchasing", "Quote Approval": "approvals", "Receiving": "receiving"}.get(step.step_type)
+        key = {"Stock Check": "stock_check", "Purchase Handoff": "purchasing", "Quotation": "purchasing", "Quote Approval": "approvals", "Receiving": "receiving"}.get(step.step_type)
         if key:
             result[key] = True
     for row in frappe.get_all(REQUEST, filters={"status": "Pending Workflow Selection"}, fields=["name", "company", "department", "currency"], limit_page_length=0):
@@ -312,7 +341,10 @@ def validate_steps(steps):
     for step in steps:
         if value(step, "approver_source") not in ("User", "Role", "Department Manager"):
             fail("error.workflow_assignee")
-        if value(step, "step_type") == "Quote Approval" and value(step, "approval_method") not in ("Any", "All"):
+        method = value(step, "approval_method") or "Any"
+        if method not in ("Any", "All"):
+            fail("error.workflow_order")
+        if value(step, "step_type") == "Quotation" and method != "Any":
             fail("error.workflow_order")
 
 
@@ -331,6 +363,7 @@ def bridge(action, **kwargs):
         "advance": lambda: advance(kwargs["request"], kwargs["instance"]),
         "actions": lambda: actions(kwargs["request"], kwargs["user"]),
         "validate_steps": lambda: validate_steps(kwargs["steps"]),
+        "normalize_workflow_users": lambda: normalize_workflow_users(kwargs["source"], kwargs.get("selected"), kwargs.get("legacy_user"), kwargs["allowed_users"]),
         "capabilities": lambda: capabilities(kwargs["user"]),
         "enqueue": lambda: enqueue(kwargs["request"], kwargs["instance"], kwargs.get("step")),
         "selector_allowed": lambda: selector_allowed(kwargs["user"], kwargs["workflow"], kwargs["request"]),
