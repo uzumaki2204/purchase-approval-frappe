@@ -36,6 +36,8 @@ Từ v2.0.16, mục **Vai trò xử lý** trong nhóm Quản trị mở trang t�
 
 Từ v2.0.17, trang **Vai trò xử lý** liệt kê các Role đang có User đủ điều kiện trong công ty/phòng ban được chọn, cùng số User có thể xử lý. Danh sách dùng cùng điều kiện với trình sửa quy trình và được làm mới khi đổi phạm vi hoặc bấm Tải lại. Việc xem Role cần quyền đọc Role trong Frappe.
 
+Từ v2.0.18, danh sách này chỉ hiển thị Role thuộc Purchase Approval. Bản nâng cấp ghi nhận 8 Role mặc định, Role đã được dùng trong quy trình và Role có tiền tố `PA `. Role tạo từ trang Purchase Approval được ghi nhận ngay. Với Role cũ chưa được dùng và không có tiền tố `PA `, quản trị viên có thể dùng **Thêm Role hiện có** để đưa Role đó vào Purchase Approval. Role vẫn cần User đang hoạt động và đủ phạm vi để xuất hiện trong danh sách.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

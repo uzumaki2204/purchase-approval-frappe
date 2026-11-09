@@ -135,9 +135,15 @@ def ensure_metadata():
 
 def after_install():
     ensure_metadata()
+    from purchase_approval.workflow_roles import backfill
+
+    backfill()
     frappe.db.set_single_value("PA Settings", "email_enabled", 0)
     frappe.db.set_single_value("PA Settings", "graph_mail_enabled", 0)
 
 
 def after_migrate():
     ensure_metadata()
+    from purchase_approval.workflow_roles import backfill
+
+    backfill()

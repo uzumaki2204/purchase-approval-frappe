@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import frappe
 
-from purchase_approval import workflow_runtime as runtime
+from purchase_approval import workflow_roles, workflow_runtime as runtime
 
 
 WORKFLOW = "PA Approval Workflow"
@@ -110,6 +110,8 @@ def list_purchase_approval_roles(payload=None):
         fail("error.role_read_permission")
 
     users, roles = workflow_assignee_options(user, company, department)
+    registered = workflow_roles.registered_names()
+    roles = [role for role in roles if role in registered]
     if not roles:
         return {"roles": []}
 
@@ -129,6 +131,24 @@ def list_purchase_approval_roles(payload=None):
             for role in roles if role_users[role]
         ]
     }
+
+
+@frappe.whitelist(methods=["POST"])
+def register_existing_workflow_role(payload=None):
+    user = actor()
+    data = parse_payload(payload or "{}")
+    company = checked_text(data.get("company"), 140, True)
+    department = checked_text(data.get("department"), 140) or None
+    workflow_admin_scope(user, company, department)
+    if not frappe.has_permission("Role", "read", user=user):
+        fail("error.role_read_permission")
+    role_name = checked_text(data.get("role_name"), 140, True)
+    if not frappe.db.exists("Role", role_name):
+        fail("error.role_not_found")
+    if frappe.db.get_value("Role", role_name, "disabled"):
+        fail("error.role_disabled")
+    workflow_roles.register(role_name)
+    return {"role_name": role_name}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -153,6 +173,7 @@ def create_workflow_role(payload=None):
         role.insert()
     except frappe.DuplicateEntryError:
         fail("error.role_exists")
+    workflow_roles.register(role.name)
     return {"role_name": role.name}
 
 
@@ -215,6 +236,15 @@ def parse_payload(payload):
     if not isinstance(data, dict):
         fail("error.required")
     return data
+
+
+def register_referenced_roles(selector_source, selector_role, steps):
+    names = {step["approver_role"] for step in steps if step["approver_source"] == "Role"}
+    if selector_source == "Role":
+        names.add(selector_role)
+    for name in sorted(names):
+        if name:
+            workflow_roles.register(name)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -323,8 +353,10 @@ def save_approval_workflow(payload=None):
                 or same_steps != requested_steps
             ):
                 fail("error.idempotency")
+            register_referenced_roles(selector_source, selector_role, normalized)
             return workflow_admin_result(existing)
         doc = frappe.get_doc({"doctype": WORKFLOW, **values, "steps": saved_steps, "assignees": saved_assignees})
         doc.insert(ignore_permissions=True, set_name=name)
 
+    register_referenced_roles(selector_source, selector_role, normalized)
     return workflow_admin_result(doc)

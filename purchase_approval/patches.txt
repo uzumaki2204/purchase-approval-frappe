@@ -10,3 +10,5 @@ purchase_approval.patches.remove_approval_workflow_criteria
 purchase_approval.patches.configurable_request_workflow
 purchase_approval.patches.multi_user_workflow
 purchase_approval.patches.add_workflow_roles_menu
+purchase_approval.patches.add_pa_workflow_role_registry
+purchase_approval.patches.backfill_pa_workflow_roles
