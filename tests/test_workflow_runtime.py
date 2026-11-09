@@ -304,13 +304,17 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(get_all.call_args.args[0], "PA Approval Workflow")
 
     def test_multi_user_migration_backfills_workflow_assignments_only(self):
+        class WorkflowStep(types.SimpleNamespace):
+            def get(self, key, default=None):
+                return getattr(self, key, default)
+
         class Workflow:
             def __init__(self):
                 self.assignees = []
                 self.steps = [
-                    types.SimpleNamespace(step_order=1, step_type="Stock Check", approval_method="All", approver_source="User", approver_user="checker"),
-                    types.SimpleNamespace(step_order=2, step_type="Quote Approval", approval_method="All", approver_source="User", approver_user="approver"),
-                    types.SimpleNamespace(step_order=3, step_type="Quotation", approval_method="All", approver_source="User", approver_user="buyer"),
+                    WorkflowStep(step_order=1, step_type="Stock Check", approval_method="All", approver_source="User", approver_user="checker"),
+                    WorkflowStep(step_order=2, step_type="Quote Approval", approval_method="All", approver_source="User", approver_user="approver"),
+                    WorkflowStep(step_order=3, step_type="Quotation", approval_method="All", approver_source="User", approver_user="buyer"),
                 ]
                 self.saved = 0
 
@@ -329,6 +333,53 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual([(row.step_order, row.user) for row in workflow.assignees], [(1, "checker"), (2, "approver"), (3, "buyer")])
         self.assertEqual([row.approval_method for row in workflow.steps], ["Any", "All", "Any"])
         self.assertEqual(workflow.saved, 1)
+
+    def test_multi_user_migration_preserves_legacy_method_when_step_type_is_missing(self):
+        class WorkflowStep(types.SimpleNamespace):
+            def get(self, key, default=None):
+                return getattr(self, key, default)
+
+        class Workflow:
+            def __init__(self):
+                self.assignees = []
+                self.steps = [WorkflowStep(step_order=1, approval_method="All", approver_source="Role")]
+                self.saved = False
+
+            def save(self, **_kwargs):
+                self.saved = True
+
+        workflow = Workflow()
+        with patch.object(multi_user_migration.frappe, "get_all", return_value=[types.SimpleNamespace(name="WF-1")], create=True), patch.object(
+            multi_user_migration.frappe, "get_doc", return_value=workflow, create=True
+        ):
+            multi_user_migration.backfill_workflows()
+        self.assertEqual(workflow.steps[0].approval_method, "All")
+        self.assertFalse(workflow.saved)
+
+    def test_multi_user_migration_adds_missing_workflow_step_fields(self):
+        payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))
+
+        class DocType:
+            def __init__(self):
+                self.fields = [types.SimpleNamespace(fieldname="step_name", idx=1)]
+                self.saved = False
+
+            def append(self, fieldname, values):
+                row = types.SimpleNamespace(**values)
+                getattr(self, fieldname).append(row)
+                return row
+
+            def save(self, **_kwargs):
+                self.saved = True
+
+        doctype = DocType()
+        with patch.object(multi_user_migration.frappe.db, "exists", return_value=True, create=True), patch.object(
+            multi_user_migration.frappe.db, "get_value", return_value="Purchase Approval", create=True
+        ), patch.object(multi_user_migration.frappe, "get_doc", return_value=doctype, create=True):
+            multi_user_migration.ensure_workflow_step_fields(payload)
+        definition = next(row for row in payload["doctypes"] if row["name"] == "PA Approval Workflow Step")
+        self.assertEqual({row.fieldname for row in doctype.fields}, {row["fieldname"] for row in definition["fields"]})
+        self.assertTrue(doctype.saved)
 
     def test_multi_user_metadata_stores_assignments_on_workflow_parent(self):
         payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))

@@ -12,6 +12,7 @@ from purchase_approval.install import message, metadata
 
 CHILD_DOCTYPE = "PA Approval Workflow Assignee"
 PARENT_DOCTYPE = "PA Approval Workflow"
+STEP_DOCTYPE = "PA Approval Workflow Step"
 OWNED_MODULES = ("Purchase Approval", "Purchase Approval (Custom)")
 OLD_SERVER_SCRIPT_SHA256 = {
     "pa_get_approval_workflow": "fd4013feced51bc523780a4dd91f4788487a62c1df20cb02ed5be96c43ff6af4",
@@ -153,24 +154,50 @@ def ensure_parent_field(payload):
     doc.save(ignore_permissions=True)
 
 
+def ensure_workflow_step_fields(payload):
+    definition = next(row for row in payload["doctypes"] if row["name"] == STEP_DOCTYPE)
+    if not frappe.db.exists("DocType", STEP_DOCTYPE):
+        frappe.throw(message("doctype_exists", doctype=STEP_DOCTYPE))
+    module = frappe.db.get_value("DocType", STEP_DOCTYPE, "module")
+    if module not in OWNED_MODULES:
+        frappe.throw(message("doctype_exists", doctype=STEP_DOCTYPE))
+    doc = frappe.get_doc("DocType", STEP_DOCTYPE)
+    existing = {row.fieldname for row in doc.fields}
+    changed = False
+    for source in definition["fields"]:
+        if source["fieldname"] in existing:
+            continue
+        values = {key: value for key, value in source.items() if key not in ("doctype", "name")}
+        values["idx"] = max((int(row.idx or 0) for row in doc.fields), default=0) + 1
+        doc.append("fields", values)
+        existing.add(source["fieldname"])
+        changed = True
+    if changed:
+        doc.save(ignore_permissions=True)
+
+
 def backfill_workflows():
     for row in frappe.get_all("PA Approval Workflow", fields=["name"], limit_page_length=0):
         workflow = frappe.get_doc("PA Approval Workflow", row.name)
         changed = False
-        for step in workflow.steps:
-            if step.step_type == "Quotation" and step.approval_method != "Any":
+        for index, step in enumerate(workflow.steps, 1):
+            step_type = step.get("step_type")
+            approval_method = step.get("approval_method")
+            if step_type == "Quotation" and approval_method != "Any":
                 step.approval_method = "Any"
                 changed = True
-            elif step.step_type != "Quote Approval" and step.approval_method != "Any":
+            elif step_type and step_type != "Quote Approval" and approval_method != "Any":
                 step.approval_method = "Any"
                 changed = True
-            elif step.step_type == "Quote Approval" and step.approval_method not in ("Any", "All"):
+            elif (step_type == "Quote Approval" or not step_type) and approval_method not in ("Any", "All"):
                 step.approval_method = "Any"
                 changed = True
-            if step.approver_source == "User" and step.approver_user:
-                current = {assigned.user for assigned in workflow.assignees if assigned.step_order == step.step_order}
-                if step.approver_user not in current:
-                    workflow.append("assignees", {"step_order": step.step_order, "user": step.approver_user})
+            step_order = step.get("step_order") or index
+            approver_user = step.get("approver_user")
+            if step.get("approver_source") == "User" and approver_user:
+                current = {assigned.user for assigned in workflow.assignees if assigned.step_order == step_order}
+                if approver_user not in current:
+                    workflow.append("assignees", {"step_order": step_order, "user": approver_user})
                     changed = True
         if changed:
             workflow.save(ignore_permissions=True)
@@ -217,6 +244,7 @@ def execute():
     update_server_scripts(payload)
     ensure_child_doctype(payload)
     ensure_parent_field(payload)
+    ensure_workflow_step_fields(payload)
     backfill_workflows()
     update_translations(payload)
     frappe.clear_cache()

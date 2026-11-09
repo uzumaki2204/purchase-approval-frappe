@@ -26,6 +26,8 @@ Từ v2.0.11, patch cập nhật Server Script hòa trộn thay đổi không tr
 
 Từ v2.0.12, trang quản trị lưu quy trình qua Python API để không cần ghi đè `pa_save_approval_workflow` trên site. Server Script nhận hàng cục bộ cũng được giữ nguyên; runtime không lưu người nhận cuối cho đến khi đủ người trong bước `All`. Patch chỉ hòa trộn cập nhật nhãn người xử lý vào `pa_get_approval_workflow`.
 
+Từ v2.0.13, patch nâng cấp tự bổ sung các trường còn thiếu của bước quy trình trước khi chuyển người xử lý cũ; nếu bước cũ chưa có loại, chế độ `Any/All` đang lưu được giữ nguyên.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.
