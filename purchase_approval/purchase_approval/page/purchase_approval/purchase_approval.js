@@ -106,12 +106,13 @@ const PA = (() => {
     if(tag==='input'&&el.type==='checkbox'){el.classList.remove('form-control');el.classList.add('input-with-feedback');}return el;
   };
   const call = async (action, payload = {}) => {
+    const method = action.includes('.') ? action : `pa_${action}`;
     for(let attempt=0;attempt<3;attempt++) {
       try {
         const response = await frappe.call({
-          method: `pa_${action}`,
+          method,
           // Website RPC defaults to '/' instead of the Desk API route.
-          url: `/api/method/pa_${action}`,
+          url: `/api/method/${method}`,
           type: 'POST',
           args: {payload: JSON.stringify(payload)},
           // Callers own localized error display. Desk honors silent; Website
@@ -258,7 +259,6 @@ const PA = (() => {
   };
   return {t,node,call,boot,money,option,expected,idempotencyKey,input,select,table,button,modal,act,lineEditor};
 })();
-
 /* Pure routing/decimal helpers shared by the app, preview and tests. */
 const PAShell = (() => {
   const views = ['dashboard','requests','edit','detail','selection','stock_check','purchasing','pricing','approvals','receiving','received','workflows','workflow-edit','organizations','organization-edit'];
@@ -397,7 +397,7 @@ const PAWorkflows = (() => {
     }
     controls.company.onchange=()=>{controls.department.replaceChildren(...select(ctx.departments.filter(d=>d.company===controls.company.value).map(d=>[d.name,d.department_name]),'','workflow.all_departments').children);void refresh(true);};controls.department.onchange=()=>void refresh(true);
     form.addEventListener('input',markDirty);form.addEventListener('change',markDirty);
-    form.onsubmit=async e=>{e.preventDefault();if(busy||loading||!form.reportValidity())return;busy=true;save.disabled=true;error.hidden=true;try{if(steps.some(s=>s.approver_source==='User'&&!(s.approver_users||[]).length))throw new Error(t('error.workflow_assignee'));const payload={...Object.fromEntries(['workflow_name','company','department','note'].map(k=>[k,controls[k].value])),is_active:controls.is_active.checked?1:0,notify_requester:controls.notify_requester.checked?1:0,selector_source:selectorSource.value,selector_user:selectorUser.approver_user,selector_role:w.selector_role||'PA Purchasing',steps:steps.map((s,i)=>({...s,approver_user:(s.approver_users||[])[0]||'',approver_users:s.approver_source==='User'?(s.approver_users||[]):[],approval_method:s.step_type==='Quotation'?'Any':s.approval_method,step_order:i+1})),...(result?{name:w.name,expected_modified:w.modified}:{idempotency_key:key})};const saved=await call('save_approval_workflow',payload);if(!isCurrent())return;markSaved();toast(t('workflow.saved'));await go('workflows','',{company:saved.workflow.company});}catch(err){if(isCurrent()){error.textContent=err.message||t('error.server');error.hidden=false;error.scrollIntoView({block:'nearest'});}}finally{busy=false;save.disabled=false;}};
+    form.onsubmit=async e=>{e.preventDefault();if(busy||loading||!form.reportValidity())return;busy=true;save.disabled=true;error.hidden=true;try{if(steps.some(s=>s.approver_source==='User'&&!(s.approver_users||[]).length))throw new Error(t('error.workflow_assignee'));const payload={...Object.fromEntries(['workflow_name','company','department','note'].map(k=>[k,controls[k].value])),is_active:controls.is_active.checked?1:0,notify_requester:controls.notify_requester.checked?1:0,selector_source:selectorSource.value,selector_user:selectorUser.approver_user,selector_role:w.selector_role||'PA Purchasing',steps:steps.map((s,i)=>({...s,approver_user:(s.approver_users||[])[0]||'',approver_users:s.approver_source==='User'?(s.approver_users||[]):[],approval_method:s.step_type==='Quotation'?'Any':s.approval_method,step_order:i+1})),...(result?{name:w.name,expected_modified:w.modified}:{idempotency_key:key})};const saved=await call('purchase_approval.workflow_api.save_approval_workflow',payload);if(!isCurrent())return;markSaved();toast(t('workflow.saved'));await go('workflows','',{company:saved.workflow.company});}catch(err){if(isCurrent()){error.textContent=err.message||t('error.server');error.hidden=false;error.scrollIntoView({block:'nearest'});}}finally{busy=false;save.disabled=false;}};
     mount.append(form);await refresh();
   }
   return {list,edit};

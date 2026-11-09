@@ -23,6 +23,7 @@ spec.loader.exec_module(runtime)
 sys.path.insert(0, str(path.parents[1]))
 from purchase_approval.patches import configurable_request_workflow as migration
 from purchase_approval.patches import multi_user_workflow as multi_user_migration
+from purchase_approval import workflow_api
 
 
 def step(order, kind, status="Pending", email=0, method="Any"):
@@ -172,6 +173,63 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual((first.status, second.status), ("Approved", "Approved"))
         advance.assert_called_once_with(request, instance)
 
+    def test_partial_receiving_does_not_commit_receipt_fields(self):
+        request = types.SimpleNamespace(name="PA-1", received_by="first", received_at="now")
+        current = step(1, "Receiving", method="All")
+        assignees = [
+            types.SimpleNamespace(step_order=1, user="first", status="Pending", acted_at=None, comment=""),
+            types.SimpleNamespace(step_order=1, user="second", status="Pending", acted_at=None, comment=""),
+        ]
+        instance = types.SimpleNamespace(name="PAI-1", current_sequence=1, steps=[current], assignees=assignees)
+        with patch.object(runtime, "eligible_user", return_value=True), patch.object(
+            runtime.frappe.db, "get_value", return_value={"received_by": None, "received_at": None}, create=True
+        ), patch.object(runtime.frappe, "get_all", return_value=[], create=True), patch.object(runtime, "save"):
+            self.assertFalse(runtime.finish_step(request, instance, "first"))
+        self.assertIsNone(request.received_by)
+        self.assertIsNone(request.received_at)
+
+    def test_workflow_api_persists_all_selected_users_and_legacy_first_user(self):
+        payload = {
+            "workflow_name": "Test",
+            "company": "C1",
+            "department": "D1",
+            "currency": "VND",
+            "selector_source": "Role",
+            "selector_role": "PA Purchasing",
+            "idempotency_key": "a" * 32,
+            "steps": [{
+                "step_name": "Check",
+                "step_type": "Stock Check",
+                "approval_method": "All",
+                "approver_source": "User",
+                "approver_user": "one",
+                "approver_users": ["one", "two"],
+                "send_email": 0,
+            }],
+        }
+        saved = {}
+        document = types.SimpleNamespace(insert=lambda **kwargs: saved.update(insert=kwargs))
+        response = {"workflow": {"company": "C1"}}
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "require_role"
+        ), patch.object(workflow_api, "workflow_admin_scope"), patch.object(
+            workflow_api, "workflow_assignee_options",
+            return_value=([types.SimpleNamespace(name="one"), types.SimpleNamespace(name="two")], ["PA Purchasing"]),
+        ), patch.object(workflow_api.runtime, "normalize_workflow_users", return_value=["one", "two"]), patch.object(
+            workflow_api.runtime, "validate_steps"
+        ), patch.object(workflow_api.frappe.db, "exists", return_value=False, create=True), patch.object(
+            workflow_api.frappe.db, "sql", return_value=None, create=True
+        ), patch.object(workflow_api.frappe, "get_doc", return_value=document, create=True) as get_doc, patch.object(
+            workflow_api, "workflow_admin_result", return_value=response
+        ):
+            result = workflow_api.save_approval_workflow(json.dumps(payload))
+        stored = get_doc.call_args.args[0]
+        self.assertEqual(stored["assignees"], [{"step_order": 1, "user": "one"}, {"step_order": 1, "user": "two"}])
+        self.assertEqual(stored["steps"][0]["approver_user"], "one")
+        self.assertNotIn("approver_users", stored["steps"][0])
+        self.assertEqual(saved["insert"], {"ignore_permissions": True, "set_name": "PAWF-" + "a" * 32})
+        self.assertEqual(result, response)
+
     def test_step_email_toggle_and_idempotency_key(self):
         request = types.SimpleNamespace(name="PA-1", requester="creator")
         instance = types.SimpleNamespace(name="PAI-1", assignees=[types.SimpleNamespace(step_order=1, user="checker", status="Pending")])
@@ -303,7 +361,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         for name, expected in multi_user_migration.OLD_SERVER_SCRIPT_SHA256.items():
             self.assertEqual(hashlib.sha256(baseline[name].encode("utf-8")).hexdigest(), expected)
 
-    def test_multi_user_migration_updates_conflicted_scripts_without_losing_other_edits(self):
+    def test_multi_user_migration_updates_get_script_without_losing_other_edits(self):
         payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))
         baseline = json.loads((path.parent / "patches" / "multi_user_workflow_base.json").read_text(encoding="utf-8"))
         names = set(multi_user_migration.OLD_SERVER_SCRIPT_SHA256)
@@ -326,8 +384,6 @@ class WorkflowRuntimeTests(unittest.TestCase):
         for name, source in updated:
             self.assertIn("Site customization.", source)
         self.assertIn("for assigned in doc.assignees:", dict(updated)["pa_get_approval_workflow"])
-        self.assertIn("normalize_workflow_users", dict(updated)["pa_save_approval_workflow"])
-        self.assertIn("if completed:", dict(updated)["pa_receive_purchase_request"])
 
 
 if __name__ == "__main__":

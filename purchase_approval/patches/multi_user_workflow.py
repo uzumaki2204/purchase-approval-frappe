@@ -15,8 +15,6 @@ PARENT_DOCTYPE = "PA Approval Workflow"
 OWNED_MODULES = ("Purchase Approval", "Purchase Approval (Custom)")
 OLD_SERVER_SCRIPT_SHA256 = {
     "pa_get_approval_workflow": "fd4013feced51bc523780a4dd91f4788487a62c1df20cb02ed5be96c43ff6af4",
-    "pa_save_approval_workflow": "309a34f5a2fe472090e75423fcb369cc2663e320eaa3211482fb50a261c85d3d",
-    "pa_receive_purchase_request": "b70f72d073eb750d9e9bb70ca87042b906e02de37e3a085b12d801304f877de8",
 }
 UPDATED_TRANSLATIONS = {
     "action.confirm_handoff",

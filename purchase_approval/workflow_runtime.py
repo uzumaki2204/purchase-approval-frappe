@@ -240,6 +240,14 @@ def finish_step(request, instance, user, comment=""):
     step = active_step(instance)
     if not step or not assigned(instance, user) or not eligible_user(user, request):
         fail("error.permission")
+    previous_receipt = None
+    if step.step_type == "Receiving":
+        previous_receipt = frappe.db.get_value(
+            REQUEST,
+            request.name,
+            ["received_by", "received_at"],
+            as_dict=True,
+        )
     acted_at = frappe.utils.now()
     row = next(row for row in instance.assignees if row.step_order == step.step_order and row.user == user and row.status == "Pending")
     row.status = "Approved"
@@ -258,6 +266,9 @@ def finish_step(request, instance, user, comment=""):
             frappe.db.set_value(OUTBOX, outbox.name, "status", "Cancelled", update_modified=False)
     if not complete:
         save(instance)
+        if previous_receipt:
+            request.received_by = previous_receipt.get("received_by")
+            request.received_at = previous_receipt.get("received_at")
         save(request)
         return False
     advance(request, instance)
