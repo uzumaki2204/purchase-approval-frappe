@@ -398,11 +398,33 @@ class WorkflowRuntimeTests(unittest.TestCase):
             }[doctype]
         with patch.object(workflow_roles, "metadata", return_value={"roles": [{"name": "PA Super Admin"}]}), patch.object(
             workflow_roles.frappe.db, "exists", side_effect=lambda doctype, name: doctype == "DocType" or name != "PA Custom Reviewer", create=True
+        ), patch.object(
+            workflow_roles.frappe.db, "has_column", return_value=True, create=True
         ), patch.object(workflow_roles.frappe, "get_all", side_effect=get_all, create=True), patch.object(
             workflow_roles, "register"
         ) as register:
             workflow_roles.backfill()
         self.assertEqual({call.args[0] for call in register.call_args_list}, {"PA Super Admin", "PA Approver", "Budget Reviewer"})
+
+    def test_role_backfill_skips_missing_selector_column_on_legacy_site(self):
+        queried = []
+
+        def get_all(doctype, **_kwargs):
+            queried.append(doctype)
+            if doctype == "PA Approval Workflow Step":
+                return [types.SimpleNamespace(approver_role="Budget Reviewer")]
+            return [types.SimpleNamespace(name="PA Custom Reviewer")]
+
+        with patch.object(workflow_roles, "metadata", return_value={"roles": [{"name": "PA Super Admin"}]}), patch.object(
+            workflow_roles.frappe.db, "exists", return_value=True, create=True
+        ), patch.object(
+            workflow_roles.frappe.db, "has_column", side_effect=lambda _doctype, field: field == "approver_role", create=True
+        ), patch.object(workflow_roles.frappe, "get_all", side_effect=get_all, create=True), patch.object(
+            workflow_roles, "register"
+        ) as register:
+            workflow_roles.backfill()
+        self.assertEqual(queried, ["PA Approval Workflow Step", "Role"])
+        self.assertEqual({call.args[0] for call in register.call_args_list}, {"PA Super Admin", "PA Custom Reviewer", "Budget Reviewer"})
 
     def test_role_registration_is_idempotent(self):
         stored = set()

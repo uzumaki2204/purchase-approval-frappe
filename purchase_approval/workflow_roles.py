@@ -28,7 +28,9 @@ def register(role_name):
 
 def backfill():
     names = {item["name"] for item in metadata()["roles"]}
-    if frappe.db.exists("DocType", "PA Approval Workflow"):
+    if frappe.db.exists("DocType", "PA Approval Workflow") and frappe.db.has_column(
+        "PA Approval Workflow", "selector_role"
+    ):
         names.update(
             row.selector_role
             for row in frappe.get_all(
@@ -36,7 +38,9 @@ def backfill():
             )
             if row.selector_role
         )
-    if frappe.db.exists("DocType", "PA Approval Workflow Step"):
+    if frappe.db.exists("DocType", "PA Approval Workflow Step") and frappe.db.has_column(
+        "PA Approval Workflow Step", "approver_role"
+    ):
         names.update(
             row.approver_role
             for row in frappe.get_all(
