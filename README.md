@@ -28,6 +28,8 @@ Từ v2.0.12, trang quản trị lưu quy trình qua Python API để không c�
 
 Từ v2.0.13, patch nâng cấp tự bổ sung các trường còn thiếu của bước quy trình trước khi chuyển người xử lý cũ; nếu bước cũ chưa có loại, chế độ `Any/All` đang lưu được giữ nguyên.
 
+Từ v2.0.14, bản dịch backend được lưu một dòng tiếng Việt theo mỗi `message_key`, đúng với khóa chính của `PA Translation`; bản dịch tiếng Anh tiếp tục được phân phát từ catalog giao diện.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

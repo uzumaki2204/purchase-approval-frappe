@@ -104,13 +104,15 @@ def ensure_permissions(payload):
 
 def ensure_translations(payload):
     existing = {
-        (row.message_key, row.language)
+        row.message_key
         for row in frappe.get_all(
             "PA Translation", fields=["message_key", "language"], limit_page_length=10000
         )
     }
     for item in payload["translations"]:
-        key = (item["message_key"], item["language"])
+        if item["language"] != "vi":
+            continue
+        key = item["message_key"]
         if key in existing:
             continue
         frappe.get_doc({"doctype": "PA Translation", **item}).insert(ignore_permissions=True)

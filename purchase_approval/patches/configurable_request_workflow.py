@@ -115,7 +115,9 @@ def upgrade_workflows(payload):
 
 def update_translations(payload):
     for source in payload["translations"]:
-        name = frappe.db.exists("PA Translation", {"message_key": source["message_key"], "language": source["language"]})
+        if source["language"] != "vi":
+            continue
+        name = frappe.db.exists("PA Translation", source["message_key"])
         if not name:
             frappe.get_doc({"doctype": "PA Translation", **source}).insert(ignore_permissions=True)
         elif source["message_key"] in UPDATED_TRANSLATIONS:

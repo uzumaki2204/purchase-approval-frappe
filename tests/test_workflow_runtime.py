@@ -23,7 +23,7 @@ spec.loader.exec_module(runtime)
 sys.path.insert(0, str(path.parents[1]))
 from purchase_approval.patches import configurable_request_workflow as migration
 from purchase_approval.patches import multi_user_workflow as multi_user_migration
-from purchase_approval import workflow_api
+from purchase_approval import install, workflow_api
 
 
 def step(order, kind, status="Pending", email=0, method="Any"):
@@ -380,6 +380,63 @@ class WorkflowRuntimeTests(unittest.TestCase):
         definition = next(row for row in payload["doctypes"] if row["name"] == "PA Approval Workflow Step")
         self.assertEqual({row.fieldname for row in doctype.fields}, {row["fieldname"] for row in definition["fields"]})
         self.assertTrue(doctype.saved)
+
+    def test_translation_installer_uses_one_vietnamese_row_per_key(self):
+        payload = {"translations": [
+            {"message_key": "action.confirm_handoff", "language": "vi", "text": "Vietnamese"},
+            {"message_key": "action.confirm_handoff", "language": "en", "text": "English"},
+        ]}
+        inserted = []
+
+        class Translation:
+            def __init__(self, values):
+                self.values = values
+
+            def insert(self, **_kwargs):
+                inserted.append(self.values)
+
+        with patch.object(install.frappe, "get_all", return_value=[], create=True), patch.object(
+            install.frappe, "get_doc", side_effect=lambda values: Translation(values), create=True
+        ):
+            install.ensure_translations(payload)
+        self.assertEqual([(row["message_key"], row["language"]) for row in inserted], [("action.confirm_handoff", "vi")])
+
+    def test_translation_patches_upsert_by_unique_message_key(self):
+        payload = {"translations": [
+            {"message_key": "action.confirm_handoff", "language": "vi", "text": "Vietnamese"},
+            {"message_key": "action.confirm_handoff", "language": "en", "text": "English"},
+        ]}
+        updates = []
+        with patch.object(multi_user_migration.frappe.db, "exists", return_value="action.confirm_handoff", create=True), patch.object(
+            multi_user_migration.frappe.db,
+            "set_value",
+            side_effect=lambda *args, **kwargs: updates.append((args, kwargs)),
+            create=True,
+        ):
+            multi_user_migration.update_translations(payload)
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(updates[0][0][1], "action.confirm_handoff")
+        self.assertEqual(updates[0][0][2], {"language": "vi", "text": "Vietnamese"})
+
+    def test_legacy_workflow_patch_does_not_insert_duplicate_english_translation_rows(self):
+        payload = {"translations": [
+            {"message_key": "action.confirm_handoff", "language": "vi", "text": "Vietnamese"},
+            {"message_key": "action.confirm_handoff", "language": "en", "text": "English"},
+        ]}
+        inserted = []
+
+        class Translation:
+            def __init__(self, values):
+                self.values = values
+
+            def insert(self, **_kwargs):
+                inserted.append(self.values)
+
+        with patch.object(migration.frappe.db, "exists", return_value=None, create=True), patch.object(
+            migration.frappe, "get_doc", side_effect=lambda values: Translation(values), create=True
+        ):
+            migration.update_translations(payload)
+        self.assertEqual([(row["message_key"], row["language"]) for row in inserted], [("action.confirm_handoff", "vi")])
 
     def test_multi_user_metadata_stores_assignments_on_workflow_parent(self):
         payload = json.loads((path.parent / "metadata" / "purchase_approval.json").read_text(encoding="utf-8"))

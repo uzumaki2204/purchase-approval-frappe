@@ -229,14 +229,18 @@ def update_server_scripts(payload):
 
 def update_translations(payload):
     for source in payload["translations"]:
-        if source["message_key"] not in UPDATED_TRANSLATIONS:
+        if source["language"] != "vi" or source["message_key"] not in UPDATED_TRANSLATIONS:
             continue
-        filters = {"message_key": source["message_key"], "language": source["language"]}
-        name = frappe.db.exists("PA Translation", filters)
+        name = frappe.db.exists("PA Translation", source["message_key"])
         if not name:
             frappe.get_doc({"doctype": "PA Translation", **source}).insert(ignore_permissions=True)
         else:
-            frappe.db.set_value("PA Translation", name, "text", source["text"], update_modified=False)
+            frappe.db.set_value(
+                "PA Translation",
+                name,
+                {"language": "vi", "text": source["text"]},
+                update_modified=False,
+            )
 
 
 def execute():
