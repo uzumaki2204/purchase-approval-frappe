@@ -18254,6 +18254,26 @@
       "message_key": "error.role_permissions_advanced",
       "language": "en",
       "text": "This DocType has multiple level-zero rules; edit them in Frappe Role Permissions Manager."
+    },
+    {
+      "message_key": "error.workflow_in_use",
+      "language": "vi",
+      "text": "Quy trình đã được dùng trong đề nghị hoặc phiên duyệt. Hãy ngừng hoạt động thay vì xóa."
+    },
+    {
+      "message_key": "error.workflow_in_use",
+      "language": "en",
+      "text": "This workflow is used by a request or approval instance. Deactivate it instead of deleting it."
+    },
+    {
+      "message_key": "error.workflow_delete_conflict",
+      "language": "vi",
+      "text": "Quy trình đã thay đổi. Tải lại danh sách trước khi xóa."
+    },
+    {
+      "message_key": "error.workflow_delete_conflict",
+      "language": "en",
+      "text": "This workflow changed. Reload the list before deleting it."
     }
   ]
 }

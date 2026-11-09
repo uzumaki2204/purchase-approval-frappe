@@ -360,3 +360,18 @@ def save_approval_workflow(payload=None):
 
     register_referenced_roles(selector_source, selector_role, normalized)
     return workflow_admin_result(doc)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_approval_workflow(payload=None):
+    """Delete an unused workflow while preserving request and instance history."""
+    data = parse_payload(payload or "{}")
+    doc = workflow_admin_doc(actor(), data.get("name"), lock=True)
+    if not data.get("expected_modified") or str(doc.modified) != str(data["expected_modified"]):
+        fail("error.workflow_delete_conflict")
+    if frappe.db.exists("PA Purchase Request", {"selected_workflow": doc.name}) or frappe.db.exists(
+        "PA Approval Instance", {"workflow": doc.name}
+    ):
+        fail("error.workflow_in_use")
+    frappe.delete_doc(WORKFLOW, doc.name, ignore_permissions=True)
+    return {"name": doc.name}

@@ -44,6 +44,8 @@ Từ v2.0.20, trang **Vai trò xử lý** có nút **Sửa quyền** cho từng 
 
 Từ v2.0.21, nút **Sửa quyền** mở ma trận quyền của các DocType Purchase Approval ngay trên trang **Vai trò xử lý**. Quản trị viên có quyền System Manager có thể bật hoặc tắt quyền ở mức 0 rồi lưu. Ma trận giữ nguyên quy tắc theo chủ sở hữu và các mức quyền cao hơn; nếu quyền đã thay đổi ở nơi khác, tải lại ma trận trước khi lưu.
 
+Từ v2.0.22, trang **Quy trình phê duyệt** có nút **Xóa** với hộp xác nhận. Quản trị viên trong phạm vi công ty/phòng ban chỉ xóa được quy trình chưa được phiếu đề nghị hoặc phiên duyệt sử dụng. Quy trình đã được dùng phải chuyển sang **Ngừng hoạt động** để giữ lịch sử.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

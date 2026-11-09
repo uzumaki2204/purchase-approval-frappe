@@ -37,6 +37,43 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_delete_unused_workflow_checks_scope_and_references(self):
+        doc = types.SimpleNamespace(name="PAWF-test", modified="2026-11-09 10:00:00")
+        payload = {"name": doc.name, "expected_modified": str(doc.modified)}
+        with patch.object(workflow_api, "actor", return_value="pa-admin"), patch.object(
+            workflow_api, "workflow_admin_doc", return_value=doc
+        ) as load, patch.object(workflow_api.frappe.db, "exists", return_value=False, create=True) as exists, patch.object(
+            workflow_api.frappe, "delete_doc", create=True
+        ) as delete:
+            result = workflow_api.delete_approval_workflow(payload)
+        load.assert_called_once_with("pa-admin", doc.name, lock=True)
+        self.assertEqual(exists.call_count, 2)
+        delete.assert_called_once_with("PA Approval Workflow", doc.name, ignore_permissions=True)
+        self.assertEqual(result, {"name": doc.name})
+
+    def test_delete_workflow_preserves_used_and_changed_records(self):
+        doc = types.SimpleNamespace(name="PAWF-test", modified="2026-11-09 10:00:00")
+        with patch.object(workflow_api, "actor", return_value="pa-admin"), patch.object(
+            workflow_api, "workflow_admin_doc", return_value=doc
+        ), patch.object(workflow_api.frappe.db, "exists", return_value=True, create=True), patch.object(
+            workflow_api.frappe, "delete_doc", create=True
+        ) as delete, patch.object(workflow_api, "fail", side_effect=ValueError) as fail:
+            with self.assertRaises(ValueError):
+                workflow_api.delete_approval_workflow({"name": doc.name, "expected_modified": str(doc.modified)})
+            fail.assert_called_with("error.workflow_in_use")
+            with self.assertRaises(ValueError):
+                workflow_api.delete_approval_workflow({"name": doc.name, "expected_modified": "stale"})
+            fail.assert_called_with("error.workflow_delete_conflict")
+        delete.assert_not_called()
+
+    def test_delete_workflow_requires_admin_scope(self):
+        with patch.object(workflow_api, "actor", return_value="other"), patch.object(
+            workflow_api, "workflow_admin_doc", side_effect=ValueError("error.permission")
+        ), patch.object(workflow_api.frappe, "delete_doc", create=True) as delete:
+            with self.assertRaises(ValueError):
+                workflow_api.delete_approval_workflow({"name": "PAWF-test", "expected_modified": "now"})
+        delete.assert_not_called()
+
     def test_roles_menu_patch_adds_only_one_item_after_workflows(self):
         items = [types.SimpleNamespace(url=roles_menu_migration.WORKFLOW_URL, idx=1),
                  types.SimpleNamespace(url="/desk/purchase-approval?view=settings", idx=2)]
