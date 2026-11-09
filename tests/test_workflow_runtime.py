@@ -26,7 +26,7 @@ from purchase_approval.patches import configurable_request_workflow as migration
 from purchase_approval.patches import multi_user_workflow as multi_user_migration
 from purchase_approval.patches import add_workflow_roles_menu as roles_menu_migration
 from purchase_approval.patches import add_pa_workflow_role_registry as role_schema_migration
-from purchase_approval import install, workflow_api, workflow_roles
+from purchase_approval import install, role_permissions, workflow_api, workflow_roles
 
 
 def step(order, kind, status="Pending", email=0, method="Any"):
@@ -750,6 +750,104 @@ class WorkflowRuntimeTests(unittest.TestCase):
         for name, source in updated:
             self.assertIn("Site customization.", source)
         self.assertIn("for assigned in doc.assignees:", dict(updated)["pa_get_approval_workflow"])
+
+
+class RolePermissionMatrixTests(unittest.TestCase):
+    def test_matrix_keeps_advanced_rules_out_of_editable_rights(self):
+        permissions = types.ModuleType("frappe.permissions")
+        permissions.get_all_perms = lambda _role: [
+            types.SimpleNamespace(parent="PA Purchase Request", name="base", permlevel=0, if_owner=0, read=1, write=1),
+            types.SimpleNamespace(parent="PA Purchase Request", name="owner", permlevel=0, if_owner=1, read=1),
+            types.SimpleNamespace(parent="PA Purchase Request", name="level-one", permlevel=1, if_owner=0, read=1),
+            types.SimpleNamespace(parent="Other DocType", name="foreign", permlevel=0, if_owner=0, read=1),
+        ]
+        definitions = {
+            "PA Purchase Request": types.SimpleNamespace(is_submittable=0, allow_import=1, issingle=0),
+        }
+        with patch.dict(sys.modules, {"frappe.permissions": permissions}):
+            result = role_permissions.matrix("PA Approver", definitions)
+        self.assertEqual(len(result["rows"]), 1)
+        self.assertEqual(result["rows"][0]["rights"]["read"], 1)
+        self.assertEqual(result["rows"][0]["rights"]["create"], 0)
+        self.assertTrue(result["rows"][0]["has_advanced"])
+        self.assertFalse(result["rows"][0]["locked"])
+        self.assertEqual(len(result["revision"]), 64)
+
+    def test_changes_reject_invalid_rules_before_writing(self):
+        row = {
+            "doctype": "PA Purchase Request", "rights": dict.fromkeys(role_permissions.RIGHTS, 0),
+            "has_rule": False, "locked": False, "is_submittable": False,
+            "allow_import": True, "issingle": False,
+        }
+        with patch.object(role_permissions, "fail", side_effect=ValueError):
+            for doctype, changes in (
+                ("Other DocType", {**row["rights"], "read": 1}),
+                ("PA Purchase Request", {**row["rights"], "cancel": 1}),
+                ("PA Purchase Request", {**row["rights"], "import": 1}),
+                ("PA Purchase Request", {**row["rights"], "submit": 1, "write": 1}),
+            ):
+                with self.subTest(doctype=doctype, changes=changes), self.assertRaises(ValueError):
+                    role_permissions.normalized_changes([{"doctype": doctype, "rights": changes}], [row])
+        rights = {**row["rights"], "read": 1, "print": 1}
+        self.assertEqual(role_permissions.normalized_changes([{"doctype": row["doctype"], "rights": rights}], [row]),
+                         [(row["doctype"], rights, False)])
+        with patch.object(role_permissions, "fail", side_effect=ValueError):
+            with self.assertRaises(ValueError):
+                role_permissions.normalized_changes(
+                    [{"doctype": row["doctype"], "rights": row["rights"]}],
+                    [{**row, "has_rule": True, "has_advanced": True, "rights": rights}],
+                )
+
+    def test_save_rejects_stale_revision_without_writing(self):
+        current = {"role_name": "PA Approver", "rows": [], "revision": "current"}
+        with patch.object(role_permissions, "authorize", return_value="PA Approver"), patch.object(
+            role_permissions, "available_doctypes", return_value={}
+        ), patch.object(role_permissions, "matrix", return_value=current), patch.object(
+            role_permissions, "apply_change"
+        ) as apply, patch.object(role_permissions, "fail", side_effect=ValueError):
+            with self.assertRaises(ValueError):
+                role_permissions.save_role_permissions({"revision": "stale", "changes": []})
+        apply.assert_not_called()
+
+    def test_save_updates_only_changed_doctype(self):
+        empty = dict.fromkeys(role_permissions.RIGHTS, 0)
+        row = {
+            "doctype": "PA Purchase Request", "rights": empty, "has_rule": False,
+            "locked": False, "has_advanced": False, "is_submittable": False,
+            "allow_import": True, "issingle": False,
+        }
+        current = {"role_name": "PA Approver", "rows": [row], "revision": "current"}
+        updated = {**current, "revision": "updated"}
+        rights = {**empty, "read": 1, "print": 1}
+        with patch.object(role_permissions, "authorize", return_value="PA Approver"), patch.object(
+            role_permissions, "available_doctypes", return_value={}
+        ), patch.object(role_permissions, "matrix", side_effect=[current, updated]), patch.object(
+            role_permissions, "apply_change"
+        ) as apply:
+            result = role_permissions.save_role_permissions({
+                "revision": "current", "changes": [{"doctype": row["doctype"], "rights": rights}],
+            })
+        apply.assert_called_once_with(row["doctype"], "PA Approver", rights, False)
+        self.assertEqual(result["revision"], "updated")
+
+    def test_authorize_requires_system_manager_and_registered_role(self):
+        data = {"company": "Company A", "department": "", "role_name": "PA Approver"}
+        with patch.object(role_permissions, "actor", return_value="pa-admin"), patch.object(
+            role_permissions, "workflow_admin_scope"
+        ), patch.object(role_permissions.frappe, "get_roles", return_value=["PA Company Admin"], create=True), patch.object(
+            role_permissions, "fail", side_effect=ValueError
+        ):
+            with self.assertRaises(ValueError):
+                role_permissions.authorize(data)
+        with patch.object(role_permissions, "actor", return_value="pa-admin"), patch.object(
+            role_permissions, "workflow_admin_scope"
+        ), patch.object(role_permissions.frappe, "get_roles", return_value=["System Manager"], create=True), patch.object(
+            role_permissions.frappe, "only_for", create=True
+        ), patch.object(role_permissions.workflow_roles, "registered_names", return_value=set()), patch.object(
+            role_permissions, "fail", side_effect=ValueError
+        ):
+            with self.assertRaises(ValueError):
+                role_permissions.authorize(data)
 
 
 if __name__ == "__main__":

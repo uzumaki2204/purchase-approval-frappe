@@ -153,6 +153,13 @@
 .pa-desk .pa-price-history-meta{padding:8px 12px;color:var(--text-muted)}
 
 .pa-desk .pa-price-table{min-width:1900px}
+.pa-desk .pa-role-matrix{min-width:1650px}
+.pa-desk .pa-role-matrix th:not(:first-child),.pa-desk .pa-role-matrix td:not(:first-child){min-width:92px;text-align:center}
+.pa-desk .pa-role-matrix th:first-child,.pa-desk .pa-role-matrix td:first-child{position:sticky;left:0;z-index:1;min-width:250px;background:var(--card-bg)}
+.pa-desk .pa-role-matrix th:first-child{z-index:2;background:var(--subtle-fg)}
+.pa-desk .pa-role-matrix-cell{display:flex;justify-content:center;align-items:center}
+.pa-desk .pa-role-checkbox{width:18px;height:18px;margin:0;accent-color:var(--primary)}
+.pa-desk .pa-role-checkbox:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .pa-desk .pa-price-table th,.pa-desk .pa-price-table td{padding:8px 10px;vertical-align:middle}
 .pa-desk .pa-price-table th:nth-child(2),.pa-desk .pa-price-table td:nth-child(2){min-width:210px}
 .pa-desk .pa-price-table th:nth-child(3),.pa-desk .pa-price-table td:nth-child(3){min-width:170px}

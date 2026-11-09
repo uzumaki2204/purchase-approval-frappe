@@ -18214,6 +18214,46 @@
       "message_key": "error.role_disabled",
       "language": "en",
       "text": "This Role is disabled."
+    },
+    {
+      "message_key": "error.role_manage_permission",
+      "language": "vi",
+      "text": "Cần quyền System Manager để sửa quyền DocType."
+    },
+    {
+      "message_key": "error.role_manage_permission",
+      "language": "en",
+      "text": "The System Manager role is required to edit DocType permissions."
+    },
+    {
+      "message_key": "error.role_permissions_invalid",
+      "language": "vi",
+      "text": "Ma trận quyền không hợp lệ. Kiểm tra quyền cơ bản và quyền phụ thuộc."
+    },
+    {
+      "message_key": "error.role_permissions_invalid",
+      "language": "en",
+      "text": "The permission matrix is invalid. Check basic permissions and dependencies."
+    },
+    {
+      "message_key": "error.role_permissions_conflict",
+      "language": "vi",
+      "text": "Quyền Role đã thay đổi. Tải lại ma trận trước khi lưu."
+    },
+    {
+      "message_key": "error.role_permissions_conflict",
+      "language": "en",
+      "text": "Role permissions changed. Reload the matrix before saving."
+    },
+    {
+      "message_key": "error.role_permissions_advanced",
+      "language": "vi",
+      "text": "DocType có nhiều quy tắc mức 0; hãy chỉnh trong Role Permissions Manager của Frappe."
+    },
+    {
+      "message_key": "error.role_permissions_advanced",
+      "language": "en",
+      "text": "This DocType has multiple level-zero rules; edit them in Frappe Role Permissions Manager."
     }
   ]
 }
