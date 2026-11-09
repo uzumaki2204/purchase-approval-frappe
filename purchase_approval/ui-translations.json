@@ -565,7 +565,12 @@
     "workflow.remove_assignee": "Bỏ chọn",
     "nav.roles": "Vai trò xử lý",
     "workflow.role_scope_hint": "Chọn công ty và phòng ban để xác nhận quyền quản trị. Role được tạo cho toàn site.",
-    "roles.created_assign": "Đã tạo Role {role}. Hãy gán Role cho User đang hoạt động và đủ phạm vi trong màn hình User."
+    "roles.created_assign": "Đã tạo Role {role}. Hãy gán Role cho User đang hoạt động và đủ phạm vi trong màn hình User.",
+    "roles.available": "Role có thể sử dụng",
+    "roles.eligible_users": "User đủ điều kiện",
+    "roles.select_scope": "Chọn công ty và phòng ban để xem Role có thể sử dụng.",
+    "roles.empty": "Chưa có Role nào có User đủ điều kiện trong phạm vi này.",
+    "error.role_read_permission": "Bạn không có quyền xem Role trong Frappe."
   },
   "roles": [
     "PA Requester",

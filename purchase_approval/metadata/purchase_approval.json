@@ -17992,6 +17992,16 @@
       "message_key": "error.role_create_permission",
       "language": "en",
       "text": "You do not have permission to create a Role in Frappe."
+    },
+    {
+      "message_key": "error.role_read_permission",
+      "language": "vi",
+      "text": "Bạn không có quyền xem Role trong Frappe."
+    },
+    {
+      "message_key": "error.role_read_permission",
+      "language": "en",
+      "text": "You do not have permission to view Roles in Frappe."
     }
   ]
 }

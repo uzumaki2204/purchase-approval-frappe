@@ -100,6 +100,38 @@ def workflow_role_creation_access(payload=None):
 
 
 @frappe.whitelist(methods=["POST"])
+def list_purchase_approval_roles(payload=None):
+    user = actor()
+    data = parse_payload(payload or "{}")
+    company = checked_text(data.get("company"), 140, True)
+    department = checked_text(data.get("department"), 140) or None
+    workflow_admin_scope(user, company, department)
+    if not frappe.has_permission("Role", "read", user=user):
+        fail("error.role_read_permission")
+
+    users, roles = workflow_assignee_options(user, company, department)
+    if not roles:
+        return {"roles": []}
+
+    eligible_users = {row.name for row in users}
+    role_users = {role: set() for role in roles}
+    for row in frappe.get_all(
+        "Has Role",
+        filters={"parenttype": "User", "parent": ["in", sorted(eligible_users)]},
+        fields=["parent", "role"],
+        limit_page_length=0,
+    ):
+        if row.role in role_users and row.parent in eligible_users:
+            role_users[row.role].add(row.parent)
+    return {
+        "roles": [
+            {"name": role, "eligible_user_count": len(role_users[role])}
+            for role in roles if role_users[role]
+        ]
+    }
+
+
+@frappe.whitelist(methods=["POST"])
 def create_workflow_role(payload=None):
     user = actor()
     data = parse_payload(payload or "{}")

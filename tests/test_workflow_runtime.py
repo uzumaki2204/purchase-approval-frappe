@@ -293,6 +293,56 @@ class WorkflowRuntimeTests(unittest.TestCase):
         scope.assert_called_once_with("admin", "C1", "D1")
         self.assertEqual(result, {"can_create_role": False})
 
+    def test_available_roles_match_workflow_options_and_count_eligible_users(self):
+        active = [types.SimpleNamespace(name=name, full_name=name) for name in ("alice", "bob", "outside")]
+        assignments = [
+            types.SimpleNamespace(parent="alice", role="PA Approver"),
+            types.SimpleNamespace(parent="alice", role="PA Approver"),
+            types.SimpleNamespace(parent="bob", role="PA Approver"),
+            types.SimpleNamespace(parent="bob", role="PA Purchasing"),
+            types.SimpleNamespace(parent="alice", role="Disabled Role"),
+            types.SimpleNamespace(parent="outside", role="Outside Role"),
+        ]
+        def get_all(doctype, **kwargs):
+            if doctype == "User":
+                self.assertEqual(kwargs["filters"], {"enabled": 1})
+                return active
+            self.assertEqual(doctype, "Has Role")
+            self.assertEqual(kwargs["filters"]["parenttype"], "User")
+            allowed = set(kwargs["filters"]["parent"][1])
+            return [row for row in assignments if row.parent in allowed]
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True), patch.object(
+            workflow_api.frappe, "get_all", side_effect=get_all, create=True
+        ), patch.object(workflow_api.frappe.db, "exists", side_effect=lambda _doctype, filters: filters["name"] != "Disabled Role", create=True), patch.object(
+            workflow_api.runtime, "eligible_user", side_effect=lambda name, _target: name != "outside"
+        ):
+            expected = workflow_api.workflow_assignee_options("admin", "C1", "D1")[1]
+            result = workflow_api.list_purchase_approval_roles(json.dumps({"company": "C1", "department": "D1"}))
+        self.assertEqual([row["name"] for row in result["roles"]], expected)
+        self.assertEqual(result["roles"], [
+            {"name": "PA Approver", "eligible_user_count": 2},
+            {"name": "PA Purchasing", "eligible_user_count": 1},
+        ])
+
+    def test_available_roles_require_scope_and_frappe_read_permission(self):
+        payload = json.dumps({"company": "C1", "department": "D1"})
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope", side_effect=ValueError("error.permission")
+        ), patch.object(workflow_api.frappe, "has_permission", create=True) as permission:
+            with self.assertRaisesRegex(ValueError, "error.permission"):
+                workflow_api.list_purchase_approval_roles(payload)
+            permission.assert_not_called()
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "has_permission", return_value=False, create=True), patch.object(
+            workflow_api.frappe, "get_all", create=True
+        ) as get_all:
+            with self.assertRaisesRegex(ValueError, "error.role_read_permission"):
+                workflow_api.list_purchase_approval_roles(payload)
+            get_all.assert_not_called()
+
     def test_workflow_role_creation_rejects_missing_permission_and_duplicate_name(self):
         with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
             workflow_api, "workflow_admin_scope"
