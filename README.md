@@ -30,6 +30,8 @@ Từ v2.0.13, patch nâng cấp tự bổ sung các trường còn thiếu của
 
 Từ v2.0.14, bản dịch backend được lưu một dòng tiếng Việt theo mỗi `message_key`, đúng với khóa chính của `PA Translation`; bản dịch tiếng Anh tiếp tục được phân phát từ catalog giao diện.
 
+Từ v2.0.15, người có quyền tạo Role trong Frappe có thể tạo Role ngay tại trang sửa quy trình. Role mới được chọn sau khi gán cho User đang hoạt động và đủ phạm vi công ty/phòng ban. Bước duyệt chung dùng hành vi duyệt hiện có và có thể đứng trước hoặc sau Báo giá; Nhận hàng vẫn ở cuối. Các phiếu đang xử lý giữ nguyên snapshot.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

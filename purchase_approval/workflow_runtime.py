@@ -334,29 +334,25 @@ def capabilities(user):
 
 def validate_steps(steps):
     if not steps or len(steps) > 30:
-        fail("error.workflow_order")
+        fail("error.workflow_steps")
     def value(step, key):
         return step.get(key)
     kinds = [value(step, "step_type") for step in steps]
     if any(kind not in KINDS for kind in kinds):
-        fail("error.workflow_order")
+        fail("error.workflow_steps")
     for one in ("Stock Check", "Purchase Handoff", "Quotation", "Receiving"):
         if kinds.count(one) > 1:
-            fail("error.workflow_order")
-    if "Quotation" in kinds and "Quote Approval" in kinds and kinds.index("Quotation") > kinds.index("Quote Approval"):
-        fail("error.workflow_order")
-    if "Receiving" in kinds and "Quote Approval" in kinds and kinds.index("Receiving") < max(i for i, kind in enumerate(kinds) if kind == "Quote Approval"):
-        fail("error.workflow_order")
+            fail("error.workflow_steps")
     if "Receiving" in kinds and kinds[-1] != "Receiving":
-        fail("error.workflow_order")
+        fail("error.workflow_steps")
     for step in steps:
         if value(step, "approver_source") not in ("User", "Role", "Department Manager"):
             fail("error.workflow_assignee")
         method = value(step, "approval_method") or "Any"
         if method not in ("Any", "All"):
-            fail("error.workflow_order")
+            fail("error.workflow_steps")
         if value(step, "step_type") == "Quotation" and method != "Any":
-            fail("error.workflow_order")
+            fail("error.workflow_steps")
 
 
 @frappe.whitelist(methods=["POST"])

@@ -15,6 +15,7 @@ fake_frappe.utils = types.SimpleNamespace(now=lambda: "2026-11-07 10:00:00")
 fake_frappe.throw = lambda text: (_ for _ in ()).throw(ValueError(text))
 fake_frappe.whitelist = lambda **_kwargs: lambda fn: fn
 fake_frappe.flags = types.SimpleNamespace(get=lambda _key: False)
+fake_frappe.DuplicateEntryError = type("DuplicateEntryError", (Exception,), {})
 sys.modules.setdefault("frappe", fake_frappe)
 path = Path(__file__).resolve().parents[1] / "purchase_approval" / "workflow_runtime.py"
 spec = importlib.util.spec_from_file_location("pa_workflow_runtime_test", path)
@@ -63,9 +64,9 @@ class WorkflowRuntimeTests(unittest.TestCase):
                  {"step_type": "Receiving", "approver_source": "Role", "approval_method": "Any"}]
         runtime.validate_steps(valid)
         runtime.validate_steps([valid[1]])  # Approval can use estimated prices without quotation.
+        runtime.validate_steps([valid[1], valid[0], valid[2]])  # A general approval can precede quotation.
         for invalid in (
             [],
-            [valid[1], valid[0]],
             [valid[2], valid[1]],
             [valid[0], valid[2], valid[1]],
             [valid[0], valid[0]],
@@ -112,6 +113,22 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(runtime, "eligible_user", return_value=True):
             self.assertEqual(runtime.actions(request, "checker"), ["stock_check"])
             self.assertEqual(runtime.actions(request, "other"), [])
+
+    def test_general_approval_uses_custom_role_membership_and_pending_assignee(self):
+        workflow_step = types.SimpleNamespace(approver_source="Role", approver_role="PA Budget Reviewer", step_type="Quote Approval")
+        request = types.SimpleNamespace(requester="creator", status="Pending Approval", current_instance="PAI-1")
+        members = [types.SimpleNamespace(parent=name) for name in ("creator", "budget", "outside")]
+        with patch.object(runtime.frappe, "get_all", return_value=members, create=True), patch.object(
+            runtime, "eligible_user", side_effect=lambda user, _request: user != "outside"
+        ):
+            self.assertEqual(runtime.assignees(workflow_step, request), ["budget"])
+        instance = types.SimpleNamespace(steps=[step(1, "Quote Approval")], current_sequence=1,
+                                         assignees=[types.SimpleNamespace(user="budget", step_order=1, status="Pending")])
+        with patch.object(runtime, "is_modern", return_value=True), patch.object(
+            runtime.frappe, "get_doc", return_value=instance, create=True
+        ), patch.object(runtime, "eligible_user", return_value=True):
+            self.assertEqual(runtime.actions(request, "budget"), ["approve", "return", "reject"])
+            self.assertEqual(runtime.actions(request, "creator"), [])
 
     def test_handoff_action_is_limited_to_pending_assignees(self):
         request = types.SimpleNamespace(status="Pending Purchasing", current_instance="PAI-1")
@@ -229,6 +246,80 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertNotIn("approver_users", stored["steps"][0])
         self.assertEqual(saved["insert"], {"ignore_permissions": True, "set_name": "PAWF-" + "a" * 32})
         self.assertEqual(result, response)
+
+    def test_workflow_role_creation_uses_frappe_create_permission(self):
+        role = types.SimpleNamespace(name="PA Budget Reviewer", insert=lambda: None)
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ) as scope, patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True) as permission, patch.object(
+            workflow_api.frappe.db, "exists", return_value=False, create=True
+        ), patch.object(workflow_api.frappe, "get_doc", return_value=role, create=True) as get_doc, patch.object(
+            role, "insert"
+        ) as insert:
+            result = workflow_api.create_workflow_role(json.dumps({"role_name": " PA Budget Reviewer ", "company": "C1", "department": "D1"}))
+        scope.assert_called_once_with("admin", "C1", "D1")
+        permission.assert_called_once_with("Role", "create", user="admin")
+        self.assertEqual(get_doc.call_args.args[0]["role_name"], "PA Budget Reviewer")
+        insert.assert_called_once_with()
+        self.assertEqual(result, {"role_name": "PA Budget Reviewer"})
+
+    def test_workflow_role_creation_access_uses_current_scope_and_frappe_permission(self):
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ) as scope, patch.object(workflow_api.frappe, "has_permission", return_value=False, create=True):
+            result = workflow_api.workflow_role_creation_access(json.dumps({"company": "C1", "department": "D1"}))
+        scope.assert_called_once_with("admin", "C1", "D1")
+        self.assertEqual(result, {"can_create_role": False})
+
+    def test_workflow_role_creation_rejects_missing_permission_and_duplicate_name(self):
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "has_permission", return_value=False, create=True), patch.object(
+            workflow_api.frappe, "get_doc", create=True
+        ) as get_doc:
+            with self.assertRaisesRegex(ValueError, "error.role_create_permission"):
+                workflow_api.create_workflow_role(json.dumps({"role_name": "PA Budget Reviewer", "company": "C1", "department": "D1"}))
+            get_doc.assert_not_called()
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True), patch.object(
+            workflow_api.frappe.db, "exists", return_value=True, create=True
+        ), patch.object(workflow_api.frappe, "get_doc", create=True) as get_doc:
+            with self.assertRaisesRegex(ValueError, "error.role_exists"):
+                workflow_api.create_workflow_role(json.dumps({"role_name": "PA Budget Reviewer", "company": "C1", "department": "D1"}))
+            get_doc.assert_not_called()
+
+    def test_workflow_role_creation_translates_duplicate_insert_race(self):
+        role = types.SimpleNamespace(insert=lambda: (_ for _ in ()).throw(fake_frappe.DuplicateEntryError()))
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True), patch.object(
+            workflow_api.frappe.db, "exists", return_value=False, create=True
+        ), patch.object(workflow_api.frappe, "get_doc", return_value=role, create=True):
+            with self.assertRaisesRegex(ValueError, "error.role_exists"):
+                workflow_api.create_workflow_role(json.dumps({"role_name": "PA Budget Reviewer", "company": "C1"}))
+
+    def test_workflow_role_name_rejects_empty_and_control_characters(self):
+        with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True):
+            for name in (" ", "PA\nReviewer", "x" * 141):
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, "error.role_name"):
+                    workflow_api.create_workflow_role(json.dumps({"role_name": name, "company": "C1", "department": "D1"}))
+
+    def test_role_options_require_an_active_user_in_scope(self):
+        assignments = []
+        user = types.SimpleNamespace(name="approver", full_name="Approver")
+        def get_all(doctype, **_kwargs):
+            return [user] if doctype == "User" else assignments if doctype == "Has Role" else []
+        with patch.object(workflow_api, "workflow_admin_scope"), patch.object(
+            workflow_api.frappe, "get_all", side_effect=get_all, create=True
+        ), patch.object(workflow_api.runtime, "eligible_user", return_value=True), patch.object(
+            workflow_api.frappe.db, "exists", return_value=True, create=True
+        ):
+            self.assertEqual(workflow_api.workflow_assignee_options("admin", "C1", "D1")[1], [])
+            assignments.append(types.SimpleNamespace(role="PA Budget Reviewer"))
+            self.assertEqual(workflow_api.workflow_assignee_options("admin", "C1", "D1")[1], ["PA Budget Reviewer"])
 
     def test_step_email_toggle_and_idempotency_key(self):
         request = types.SimpleNamespace(name="PA-1", requester="creator")

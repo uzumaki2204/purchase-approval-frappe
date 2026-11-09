@@ -17929,6 +17929,46 @@
       "message_key": "workflow.remove_assignee",
       "language": "en",
       "text": "Remove"
+    },
+    {
+      "message_key": "error.workflow_steps",
+      "language": "vi",
+      "text": "Quy trình cần từ 1 đến 30 bước hợp lệ; nếu có Nhận hàng, bước này phải ở cuối."
+    },
+    {
+      "message_key": "error.role_name",
+      "language": "vi",
+      "text": "Tên Role không hợp lệ."
+    },
+    {
+      "message_key": "error.role_exists",
+      "language": "vi",
+      "text": "Role này đã tồn tại."
+    },
+    {
+      "message_key": "error.role_create_permission",
+      "language": "vi",
+      "text": "Bạn không có quyền tạo Role trong Frappe."
+    },
+    {
+      "message_key": "error.workflow_steps",
+      "language": "en",
+      "text": "A workflow needs 1 to 30 valid steps; Receiving must be the last step when present."
+    },
+    {
+      "message_key": "error.role_name",
+      "language": "en",
+      "text": "The Role name is invalid."
+    },
+    {
+      "message_key": "error.role_exists",
+      "language": "en",
+      "text": "This Role already exists."
+    },
+    {
+      "message_key": "error.role_create_permission",
+      "language": "en",
+      "text": "You do not have permission to create a Role in Frappe."
     }
   ]
 }

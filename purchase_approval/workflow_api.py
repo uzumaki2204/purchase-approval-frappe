@@ -89,6 +89,41 @@ def workflow_assignee_options(user, company, department):
     return users, sorted(roles)
 
 
+@frappe.whitelist(methods=["POST"])
+def workflow_role_creation_access(payload=None):
+    user = actor()
+    data = parse_payload(payload or "{}")
+    company = checked_text(data.get("company"), 140, True)
+    department = checked_text(data.get("department"), 140) or None
+    workflow_admin_scope(user, company, department)
+    return {"can_create_role": bool(frappe.has_permission("Role", "create", user=user))}
+
+
+@frappe.whitelist(methods=["POST"])
+def create_workflow_role(payload=None):
+    user = actor()
+    data = parse_payload(payload or "{}")
+    company = checked_text(data.get("company"), 140, True)
+    department = checked_text(data.get("department"), 140) or None
+    workflow_admin_scope(user, company, department)
+    if not frappe.has_permission("Role", "create", user=user):
+        fail("error.role_create_permission")
+    role_name = data.get("role_name")
+    if not isinstance(role_name, str):
+        fail("error.role_name")
+    role_name = role_name.strip()
+    if not role_name or len(role_name) > 140 or any(ord(char) < 32 or ord(char) == 127 for char in role_name):
+        fail("error.role_name")
+    if frappe.db.exists("Role", role_name):
+        fail("error.role_exists")
+    role = frappe.get_doc({"doctype": "Role", "role_name": role_name, "desk_access": 1, "disabled": 0, "is_custom": 1})
+    try:
+        role.insert()
+    except frappe.DuplicateEntryError:
+        fail("error.role_exists")
+    return {"role_name": role.name}
+
+
 def workflow_admin_doc(user, name, lock=False):
     name = checked_text(name, 140, True)
     row = frappe.db.get_value(WORKFLOW, name, ["company", "department"], as_dict=True)
@@ -166,12 +201,12 @@ def save_approval_workflow(payload=None):
         fail("error.required")
     steps = data.get("steps")
     if not isinstance(steps, list) or not steps or len(steps) > 30:
-        fail("error.workflow_order")
+        fail("error.workflow_steps")
 
     normalized = []
     for index, step in enumerate(steps):
         if not isinstance(step, dict):
-            fail("error.workflow_order")
+            fail("error.workflow_steps")
         kind = step.get("step_type")
         source = step.get("approver_source")
         assigned_users = runtime.normalize_workflow_users(
@@ -188,7 +223,7 @@ def save_approval_workflow(payload=None):
             fail("error.workflow_assignee")
         method = "Any" if kind == "Quotation" else (step.get("approval_method") or "Any")
         if method not in ("Any", "All"):
-            fail("error.workflow_order")
+            fail("error.workflow_steps")
         normalized.append(
             {
                 "step_order": index + 1,

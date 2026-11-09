@@ -8,6 +8,7 @@
 .pa-desk #pa-content:focus{outline:none}
 #page-purchase-approval .pa-view-control{width:220px;max-width:100%;flex:0 0 220px}
 .pa-desk .pa-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pa-desk .pa-role-actions{margin-top:6px}
 .pa-desk .pa-button{display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
 .pa-desk .pa-row-actions{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .pa-desk .pa-table-icon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;min-width:34px;padding:0;border-radius:var(--radius,8px)}
