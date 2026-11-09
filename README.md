@@ -40,6 +40,8 @@ Từ v2.0.18, danh sách này chỉ hiển thị Role thuộc Purchase Approval.
 
 Từ v2.0.19, bản vá ghi nhận Role kiểm tra cột dữ liệu thực tế trước khi đọc quy trình cũ. Site thiếu cột `selector_role` vẫn migrate được; các Role mặc định và Role đang lưu ở bước duyệt tiếp tục được ghi nhận.
 
+Từ v2.0.20, trang **Vai trò xử lý** có nút **Sửa quyền** cho từng Role. Quản trị viên có quyền System Manager chọn một DocType Purchase Approval rồi mở Role Permissions Manager của Frappe với Role và DocType đã chọn. Quyền DocType áp dụng toàn site; quyền xử lý từng bước quy trình vẫn do cấu hình quy trình quyết định.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

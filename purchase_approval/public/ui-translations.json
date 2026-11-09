@@ -575,7 +575,14 @@
     "roles.register_hint": "Nhập đúng tên Role Frappe để đưa vào Purchase Approval. Role sẽ hiện trong danh sách khi có User đủ phạm vi.",
     "roles.registered": "Đã thêm Role {role} vào Purchase Approval. Gán Role cho User đủ phạm vi rồi tải lại danh sách.",
     "error.role_not_found": "Không tìm thấy Role trong Frappe.",
-    "error.role_disabled": "Role này đang bị vô hiệu hóa."
+    "error.role_disabled": "Role này đang bị vô hiệu hóa.",
+    "roles.permissions": "Quyền",
+    "roles.edit_permissions": "Sửa quyền",
+    "roles.permission_doctype": "Loại tài liệu",
+    "roles.permission_scope": "Quyền DocType áp dụng cho Role trên toàn site. Frappe sẽ mở màn hình quản lý quyền cho Role và loại tài liệu đã chọn.",
+    "roles.permission_admin_required": "Cần quyền System Manager của Frappe để sửa quyền DocType.",
+    "roles.no_permission_doctypes": "Không tìm thấy DocType Purchase Approval để sửa quyền.",
+    "error.role_permission_manager": "Không mở được trình quản lý quyền Frappe. Hãy kiểm tra quyền System Manager."
   },
   "roles": [
     "PA Requester",
