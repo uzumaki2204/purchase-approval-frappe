@@ -68,6 +68,8 @@ Từ v2.0.32, patch Pilot bổ sung API chọn quy trình và xác nhận kiểm
 
 Từ v2.0.33, patch Pilot bổ sung API xác nhận bàn giao đề nghị mua vào cùng danh sách bảo vệ. Site đã cài v2.0.32 sẽ được cập nhật ba Server Script liên quan mà không thay đổi phần mã khác; phiếu đang chờ bàn giao tiếp tục ở bước hiện tại.
 
+Từ v2.0.34, patch Pilot nâng cấp API duyệt báo giá và nhận hàng trên các site vẫn dùng nhánh Server Script cũ. Khi duyệt xong, phiếu chuyển sang bước Nhận hàng với trạng thái `Approved`. Phiếu đã ở bước Nhận hàng nhưng còn trạng thái `Pending Approval` vẫn được người được giao xác nhận nếu tất cả các bước trước đã hoàn tất.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

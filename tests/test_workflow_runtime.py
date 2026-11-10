@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import sys
+import textwrap
 import types
 import unittest
 from datetime import datetime
@@ -34,6 +35,7 @@ from purchase_approval.patches import activate_step_notifications as notificatio
 from purchase_approval.patches import repair_purchase_request_status_options as status_migration
 from purchase_approval.patches import repair_workflow_schema as schema_migration
 from purchase_approval.patches import repair_workflow_guard_commands as guard_migration
+from purchase_approval.patches import repair_approval_receiving_flow as receiving_migration
 from purchase_approval import install, notification_delivery, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
@@ -50,6 +52,65 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_receiving_migration_upgrades_legacy_actions_and_keeps_other_code(self):
+        baselines = json.loads(receiving_migration.BASELINES.read_text(encoding="utf-8"))
+        targets = {row["name"]: row["script"] for row in install.metadata()["server_scripts"]}
+        for name, function in receiving_migration.FUNCTIONS.items():
+            target = targets[name]
+            span = notification_migration.function_span(target, function)
+            legacy = target[: span[0]] + baselines[name]["legacy"] + target[span[1] :]
+            legacy = legacy.replace("    # All business writes", "    # Local note.\n    # All business writes", 1)
+            updated = receiving_migration.upgraded_script(name, legacy, target, baselines)
+            self.assertIsNotNone(updated)
+            self.assertIn("# Local note.", updated)
+            self.assertIn("action='is_modern'", updated)
+            self.assertEqual(receiving_migration.upgraded_script(name, updated, target, baselines), updated)
+
+    def test_receiving_action_accepts_old_approval_status_only_after_prior_steps_finish(self):
+        script = next(row["script"] for row in install.metadata()["server_scripts"] if row["name"] == "pa_receive_purchase_request")
+        span = notification_migration.function_span(script, "receive_request")
+        request = types.SimpleNamespace(name="PA-1", status="Pending Approval", received_by=None, received_at=None)
+        previous = step(1, "Quote Approval", status="Approved")
+        receiving = step(2, "Receiving")
+        instance = types.SimpleNamespace(steps=[previous, receiving])
+        writes = []
+
+        def bridge(*_args, **kwargs):
+            action = kwargs["action"]
+            if action == "is_modern":
+                return True
+            if action == "active_step":
+                return receiving
+            if action == "assigned":
+                return True
+            if action == "finish_step":
+                request.status = "Closed"
+                return True
+            raise AssertionError(action)
+
+        context = {
+            "actor": lambda: "receiver",
+            "lock_request": lambda *_args: request,
+            "get_instance": lambda _request: instance,
+            "frappe": types.SimpleNamespace(call=bridge, utils=types.SimpleNamespace(now=lambda: "2026-11-10 17:00:00")),
+            "document_values": lambda _request: {},
+            "checked_text": lambda value, _limit: value or "",
+            "persist": lambda doc: writes.append(doc.status),
+            "audit": lambda *_args: None,
+            "request_details": lambda doc: {"status": doc.status},
+            "fail": lambda key: (_ for _ in ()).throw(ValueError(key)),
+        }
+        exec(textwrap.dedent(script[slice(*span)]), context)
+        action = context["receive_request"]
+        previous.status = "Pending"
+        with self.assertRaisesRegex(ValueError, "error.status"):
+            action({"name": "PA-1", "comment": ""})
+        self.assertEqual(writes, [])
+        previous.status = "Approved"
+        self.assertEqual(action({"name": "PA-1", "comment": ""}), {"status": "Closed"})
+        self.assertEqual(request.received_by, "receiver")
+        self.assertEqual(writes, ["Closed"])
+
     def test_guard_migration_adds_new_api_paths_without_replacing_local_code(self):
         managed = {row["name"]: row["script"] for row in install.metadata()["server_scripts"]}
         installed = {}
