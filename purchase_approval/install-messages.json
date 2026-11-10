@@ -13,7 +13,8 @@
     "slug_migrated": "Đã chuyển app Purchase Approval trên site {site}; cập nhật {references} tài liệu chứa đường dẫn cũ.",
     "workflow_script_conflict": "Script {script} đã được chỉnh sửa riêng; bản vá dừng để tránh ghi đè mã này.",
     "workflow_status_field_missing": "Thiếu trường Trạng thái của PA Purchase Request; không thể cập nhật các trạng thái quy trình.",
-    "workflow_status_options_missing": "Trường Trạng thái của PA Purchase Request vẫn thiếu trạng thái quy trình sau khi cập nhật; hãy kiểm tra cấu hình ghi đè của trường."
+    "workflow_status_options_missing": "Trường Trạng thái của PA Purchase Request vẫn thiếu trạng thái quy trình sau khi cập nhật; hãy kiểm tra cấu hình ghi đè của trường.",
+    "workflow_schema_incomplete": "DocType {doctype} còn thiếu hoặc sai trường quy trình: {fields}. Hãy kiểm tra cấu hình trường trên site."
   },
   "en": {
     "metadata_version": "Unsupported Purchase Approval metadata version.",
@@ -29,6 +30,7 @@
     "slug_migrated": "Migrated Purchase Approval on site {site}; updated {references} documents with old paths.",
     "workflow_script_conflict": "Managed script {script} has local changes; the migration stopped to avoid overwriting it.",
     "workflow_status_field_missing": "The PA Purchase Request status field is missing; workflow statuses cannot be updated.",
-    "workflow_status_options_missing": "The PA Purchase Request status field still lacks workflow statuses after the update; review field overrides."
+    "workflow_status_options_missing": "The PA Purchase Request status field still lacks workflow statuses after the update; review field overrides.",
+    "workflow_schema_incomplete": "DocType {doctype} still has missing or incompatible workflow fields: {fields}. Review the site's field configuration."
   }
 }

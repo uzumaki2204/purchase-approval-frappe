@@ -62,6 +62,8 @@ Từ v2.0.29, patch Pilot bổ sung các trạng thái Chờ chọn quy trình v
 
 Từ v2.0.30, snapshot của quy trình được chuyển thành dữ liệu JSON thuần trước khi tạo phiên xử lý. Điều này cho phép lưu các trường ngày giờ của quy trình và bước con khi gửi phiếu mới; dữ liệu quy trình và người xử lý đã chụp vẫn được giữ nguyên.
 
+Từ v2.0.31, patch Pilot sửa trường Nguồn chọn quy trình của PA Purchase Request để nhận `Automatic` và `Selector` trên site đã cài. Patch cũng bổ sung các trường cấu hình người chọn quy trình và loại bước/email còn thiếu trong DocType, giữ các giá trị tùy chỉnh khác và kiểm tra metadata hiệu lực sau migrate. Các quy trình cũ chưa có người chọn được gán lại mặc định Role `PA Purchasing`.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

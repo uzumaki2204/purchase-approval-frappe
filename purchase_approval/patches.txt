@@ -15,3 +15,4 @@ purchase_approval.patches.backfill_pa_workflow_roles
 purchase_approval.patches.upgrade_legacy_finalize_script
 purchase_approval.patches.activate_step_notifications
 purchase_approval.patches.repair_purchase_request_status_options
+purchase_approval.patches.repair_workflow_schema

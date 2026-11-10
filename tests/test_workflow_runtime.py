@@ -32,6 +32,7 @@ from purchase_approval.patches import add_pa_workflow_role_registry as role_sche
 from purchase_approval.patches import upgrade_legacy_finalize_script as finalize_migration
 from purchase_approval.patches import activate_step_notifications as notification_migration
 from purchase_approval.patches import repair_purchase_request_status_options as status_migration
+from purchase_approval.patches import repair_workflow_schema as schema_migration
 from purchase_approval import install, notification_delivery, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
@@ -48,6 +49,61 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_schema_migration_repairs_installed_workflow_fields(self):
+        old_options = "\nRequester\nPurchasing"
+        docs = {
+            name: types.SimpleNamespace(fields=fields, saved=0)
+            for name, fields in {
+                "PA Purchase Request": [types.SimpleNamespace(fieldname="selection_source", fieldtype="Select", options=old_options, idx=1)],
+                "PA Approval Workflow": [types.SimpleNamespace(fieldname="workflow_name", fieldtype="Data", idx=1)],
+                "PA Approval Instance Step": [types.SimpleNamespace(fieldname="step_order", fieldtype="Int", idx=1)],
+            }.items()
+        }
+        for doc in docs.values():
+            doc.append = lambda _field, values, doc=doc: doc.fields.append(types.SimpleNamespace(**values)) or doc.fields[-1]
+            doc.save = lambda **_kwargs: None
+        setter = types.SimpleNamespace(name="PS-1", value=old_options)
+        workflow = types.SimpleNamespace(name="WF-1", selector_source=None, selector_role=None)
+        backfills = []
+
+        def get_all(doctype, **_kwargs):
+            return [setter] if doctype == "Property Setter" else [workflow]
+
+        def set_value(doctype, _name, field, value=None, **_kwargs):
+            if doctype == "Property Setter":
+                setter.value = value
+            else:
+                backfills.append(field)
+                for key, item in field.items():
+                    setattr(workflow, key, item)
+
+        def get_meta(doctype):
+            def get_field(name):
+                row = next((field for field in docs[doctype].fields if field.fieldname == name), None)
+                if row and doctype == "PA Purchase Request" and name == "selection_source":
+                    return types.SimpleNamespace(fieldtype=row.fieldtype, options=setter.value)
+                return row
+            return types.SimpleNamespace(get_field=get_field)
+
+        with patch.object(schema_migration, "metadata", return_value=install.metadata()), patch.object(
+            schema_migration.frappe, "get_doc", side_effect=lambda _doctype, name: docs[name], create=True
+        ), patch.object(schema_migration.frappe, "get_all", side_effect=get_all, create=True), patch.object(
+            schema_migration.frappe.db, "set_value", side_effect=set_value, create=True
+        ), patch.object(schema_migration.frappe, "get_meta", side_effect=get_meta, create=True), patch.object(
+            schema_migration.frappe, "clear_cache", create=True
+        ):
+            schema_migration.execute()
+            schema_migration.execute()
+
+        self.assertIn("Automatic", setter.value)
+        self.assertIn("Selector", setter.value)
+        self.assertEqual({field.fieldname for field in docs["PA Approval Workflow"].fields} &
+                         set(schema_migration.FIELDS["PA Approval Workflow"]),
+                         set(schema_migration.FIELDS["PA Approval Workflow"]))
+        self.assertIn("step_type", {field.fieldname for field in docs["PA Approval Instance Step"].fields})
+        self.assertIn("send_email", {field.fieldname for field in docs["PA Approval Instance Step"].fields})
+        self.assertEqual(backfills, [{"selector_source": "Role", "selector_role": "PA Purchasing"}])
+
     def test_begin_serializes_workflow_dates_before_inserting_instance(self):
         created = datetime(2026, 11, 10, 14, 57, 34)
         definition = types.SimpleNamespace(
