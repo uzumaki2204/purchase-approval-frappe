@@ -125,7 +125,7 @@ def is_modern(request):
 
 
 def snapshot(instance):
-    raw = instance.workflow_snapshot
+    raw = getattr(instance, "workflow_snapshot", None)
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
@@ -366,7 +366,11 @@ def capabilities(user):
         request = frappe.get_doc(REQUEST, instance.request)
         if not eligible_user(user, request):
             continue
-        key = {"Stock Check": "stock_check", "Purchase Handoff": "purchasing", "Quotation": "purchasing", "Quote Approval": "approvals", "Receiving": "receiving"}.get(step.step_type)
+        kind = getattr(step, "step_type", None)
+        if not kind and request.status == "Pending Approval" and snapshot(instance).get("workflow_schema") != 2:
+            # Approval instances created before ordered steps have no step_type.
+            kind = "Quote Approval"
+        key = {"Stock Check": "stock_check", "Purchase Handoff": "purchasing", "Quotation": "purchasing", "Quote Approval": "approvals", "Receiving": "receiving"}.get(kind)
         if key:
             result[key] = True
     for row in frappe.get_all(REQUEST, filters={"status": "Pending Workflow Selection"}, fields=["name", "company", "department", "currency"], limit_page_length=0):

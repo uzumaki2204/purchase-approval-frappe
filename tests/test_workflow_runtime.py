@@ -46,6 +46,31 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_capabilities_handles_legacy_approval_step_without_step_type(self):
+        assignee = types.SimpleNamespace(user="approver", status="Pending", step_order=1)
+        legacy_step = types.SimpleNamespace(step_order=1, step_name="Manager", status="Pending")
+        instance = types.SimpleNamespace(
+            status="Pending", request="PA-1", current_sequence=1,
+            steps=[legacy_step], assignees=[assignee], workflow_snapshot='{"workflow_schema": 1}',
+        )
+        request = types.SimpleNamespace(status="Pending Approval")
+
+        def get_all(doctype, **_kwargs):
+            return [types.SimpleNamespace(parent="PAI-1")] if doctype == "PA Approval Assignee" else []
+
+        def get_doc(doctype, _name):
+            return instance if doctype == runtime.INSTANCE else request
+
+        with patch.object(runtime.frappe, "get_all", side_effect=get_all, create=True), patch.object(
+            runtime.frappe, "get_doc", side_effect=get_doc, create=True
+        ), patch.object(runtime, "eligible_user", return_value=True):
+            self.assertTrue(runtime.capabilities("approver")["approvals"])
+            instance.workflow_snapshot = '{"workflow_schema": 2}'
+            self.assertFalse(runtime.capabilities("approver")["approvals"])
+            legacy_step.step_type = "Quotation"
+            self.assertTrue(runtime.capabilities("approver")["purchasing"])
+            self.assertFalse(runtime.capabilities("approver")["approvals"])
+
     def test_finalize_patch_upgrades_known_legacy_script_only(self):
         self.assertEqual(finalize_migration.LEGACY_SHA256, "fb9e7e0a9965d95d2b1123d0b16c01f72c213c45d698051272472c14a3ec38b6")
         managed = next(row["script"] for row in install.metadata()["server_scripts"] if row["name"] == finalize_migration.SCRIPT)

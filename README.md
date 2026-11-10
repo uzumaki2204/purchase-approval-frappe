@@ -56,6 +56,8 @@ Từ v2.0.26, patch Pilot nâng cấp Server Script `pa_finalize_purchase_reques
 
 Từ v2.0.27, phiếu mới bắt đầu quy trình ngay khi gửi. Bước Kiểm tra kho và Bàn giao đề nghị mua tạo email cho người được giao khi bước trở thành hiện hành và cờ gửi email của bước được bật. Job nền xử lý thư sau khi giao dịch lưu thành công; Scheduler thử lại các thư còn chờ. Patch Pilot chỉ ghép các hàm cần thiết trong Server Script cũ và giữ các chỉnh sửa không trùng vùng. Phiếu đã gửi trước bản cập nhật giữ nguyên trạng thái và không được tạo thêm thông báo.
 
+Từ v2.0.28, trang Purchase Approval nhận diện phiên duyệt cũ chưa có loại bước khi tính menu thao tác. Phiên duyệt cũ đang chờ phê duyệt vẫn hiện đúng mục Chờ duyệt; dữ liệu phiên và người được giao không bị thay đổi.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.
