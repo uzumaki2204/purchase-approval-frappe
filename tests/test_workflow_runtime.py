@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import sys
 import types
 import unittest
@@ -29,6 +30,11 @@ from purchase_approval.patches import add_pa_workflow_role_registry as role_sche
 from purchase_approval import install, role_permissions, workflow_api, workflow_roles
 
 
+def localized_error(key):
+    messages = json.loads((path.parent / "ui-translations.json").read_text(encoding="utf-8"))["messages"]
+    return re.escape(messages[key])
+
+
 def step(order, kind, status="Pending", email=0, method="Any"):
     return types.SimpleNamespace(
         step_order=order, step_type=kind, status=status, send_email=email,
@@ -37,6 +43,17 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_workflow_error_uses_catalog_when_site_translation_is_missing(self):
+        expected = json.loads((path.parent / "ui-translations.json").read_text(encoding="utf-8"))["messages"][
+            "error.workflow_in_use"
+        ]
+        with patch.object(workflow_api.runtime.frappe.db, "get_value", return_value=None):
+            self.assertEqual(workflow_api.runtime.tr("error.workflow_in_use"), expected)
+        with patch.object(workflow_api.runtime.frappe.db, "get_value", return_value="error.workflow_in_use"):
+            self.assertEqual(workflow_api.runtime.tr("error.workflow_in_use"), expected)
+        with patch.object(workflow_api.runtime.frappe.db, "get_value", return_value="Site translation"):
+            self.assertEqual(workflow_api.runtime.tr("error.workflow_in_use"), "Site translation")
+
     def test_delete_unused_workflow_checks_scope_and_references(self):
         doc = types.SimpleNamespace(name="PAWF-test", modified="2026-11-09 10:00:00")
         payload = {"name": doc.name, "expected_modified": str(doc.modified)}
@@ -384,7 +401,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(workflow_api.frappe, "has_permission", return_value=False, create=True), patch.object(
             workflow_api.frappe, "get_all", create=True
         ) as get_all:
-            with self.assertRaisesRegex(ValueError, "error.role_read_permission"):
+            with self.assertRaisesRegex(ValueError, localized_error("error.role_read_permission")):
                 workflow_api.list_purchase_approval_roles(payload)
             get_all.assert_not_called()
 
@@ -404,7 +421,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(workflow_api.frappe, "has_permission", return_value=False, create=True), patch.object(
             workflow_api.workflow_roles, "register"
         ) as register:
-            with self.assertRaisesRegex(ValueError, "error.role_read_permission"):
+            with self.assertRaisesRegex(ValueError, localized_error("error.role_read_permission")):
                 workflow_api.register_existing_workflow_role(payload)
             register.assert_not_called()
         for exists, disabled, error in ((False, 0, "error.role_not_found"), (True, 1, "error.role_disabled")):
@@ -415,7 +432,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
             ), patch.object(workflow_api.frappe.db, "get_value", side_effect=lambda doctype, *_args: disabled if doctype == "Role" else None, create=True), patch.object(
                 workflow_api.workflow_roles, "register"
             ) as register:
-                with self.assertRaisesRegex(ValueError, error):
+                with self.assertRaisesRegex(ValueError, localized_error(error)):
                     workflow_api.register_existing_workflow_role(payload)
                 register.assert_not_called()
 
@@ -481,7 +498,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(workflow_api.frappe, "has_permission", return_value=False, create=True), patch.object(
             workflow_api.frappe, "get_doc", create=True
         ) as get_doc:
-            with self.assertRaisesRegex(ValueError, "error.role_create_permission"):
+            with self.assertRaisesRegex(ValueError, localized_error("error.role_create_permission")):
                 workflow_api.create_workflow_role(json.dumps({"role_name": "PA Budget Reviewer", "company": "C1", "department": "D1"}))
             get_doc.assert_not_called()
         with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
@@ -489,7 +506,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True), patch.object(
             workflow_api.frappe.db, "exists", return_value=True, create=True
         ), patch.object(workflow_api.frappe, "get_doc", create=True) as get_doc:
-            with self.assertRaisesRegex(ValueError, "error.role_exists"):
+            with self.assertRaisesRegex(ValueError, localized_error("error.role_exists")):
                 workflow_api.create_workflow_role(json.dumps({"role_name": "PA Budget Reviewer", "company": "C1", "department": "D1"}))
             get_doc.assert_not_called()
 
@@ -500,7 +517,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
         ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True), patch.object(
             workflow_api.frappe.db, "exists", return_value=False, create=True
         ), patch.object(workflow_api.frappe, "get_doc", return_value=role, create=True):
-            with self.assertRaisesRegex(ValueError, "error.role_exists"):
+            with self.assertRaisesRegex(ValueError, localized_error("error.role_exists")):
                 workflow_api.create_workflow_role(json.dumps({"role_name": "PA Budget Reviewer", "company": "C1"}))
 
     def test_workflow_role_name_rejects_empty_and_control_characters(self):
@@ -508,7 +525,7 @@ class WorkflowRuntimeTests(unittest.TestCase):
             workflow_api, "workflow_admin_scope"
         ), patch.object(workflow_api.frappe, "has_permission", return_value=True, create=True):
             for name in (" ", "PA\nReviewer", "x" * 141):
-                with self.subTest(name=name), self.assertRaisesRegex(ValueError, "error.role_name"):
+                with self.subTest(name=name), self.assertRaisesRegex(ValueError, localized_error("error.role_name")):
                     workflow_api.create_workflow_role(json.dumps({"role_name": name, "company": "C1", "department": "D1"}))
 
     def test_role_options_require_an_active_user_in_scope(self):

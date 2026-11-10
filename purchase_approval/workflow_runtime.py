@@ -5,8 +5,12 @@ never changes the actors or order of an existing instance.
 """
 
 import json
+from pathlib import Path
 
 import frappe
+
+
+_catalog = json.loads(Path(__file__).with_name("ui-translations.json").read_text(encoding="utf-8"))["messages"]
 
 
 REQUEST = "PA Purchase Request"
@@ -24,7 +28,8 @@ STAGES = {
 
 
 def tr(key):
-    return frappe.db.get_value("PA Translation", key, "text") or key
+    translated = frappe.db.get_value("PA Translation", key, "text")
+    return translated if translated and translated != key else _catalog.get(key, key)
 
 
 def fail(key):

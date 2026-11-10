@@ -125,10 +125,10 @@ const PA = (() => {
         return response.message;
       } catch (error) {
         const raw=String(error.responseText||error.message||'')+String(error.responseJSON?._server_messages||error._server_messages||'')+String(error.responseJSON?.exception||error.exception||'');
-        const catalog=context?.messages||catalog.messages.vi||{};
-        const matched=Object.entries(catalog).find(([key,value])=>key.startsWith('error.')&&raw.includes(value));
-        if(action==='create_purchase_request'&&matched?.[0]==='error.conflict'&&attempt<2){await new Promise(resolve=>setTimeout(resolve,150*(attempt+1)));continue;}
-        throw new Error(matched?.[1]||t('error.server'), {cause: error});
+        const known=catalog.messages.vi||{},values=[...Object.entries(context?.messages||{}),...Object.entries(known),...Object.entries(catalog.messages.en||{})];
+        const key=Object.keys(known).filter(name=>name.startsWith('error.')).sort((a,b)=>b.length-a.length).find(name=>raw.includes(name))||values.find(([name,value])=>name.startsWith('error.')&&value&&raw.includes(value))?.[0];
+        if(action==='create_purchase_request'&&key==='error.conflict'&&attempt<2){await new Promise(resolve=>setTimeout(resolve,150*(attempt+1)));continue;}
+        throw new Error(key?t(key):t('error.server'), {cause: error});
       }
     }
   };

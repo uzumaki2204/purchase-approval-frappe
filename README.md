@@ -46,6 +46,8 @@ Từ v2.0.21, nút **Sửa quyền** mở ma trận quyền của các DocType P
 
 Từ v2.0.22, trang **Quy trình phê duyệt** có nút **Xóa** với hộp xác nhận. Quản trị viên trong phạm vi công ty/phòng ban chỉ xóa được quy trình chưa được phiếu đề nghị hoặc phiên duyệt sử dụng. Quy trình đã được dùng phải chuyển sang **Ngừng hoạt động** để giữ lịch sử.
 
+Từ v2.0.23, API xóa quy trình dùng catalog tiếng Việt của app khi site chưa có bản ghi dịch mới; trang cũng nhận diện khóa lỗi Frappe và hiển thị thông báo đã dịch. Quy tắc chỉ xóa quy trình chưa được sử dụng vẫn được giữ nguyên.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.
