@@ -90,6 +90,33 @@ def workflow_assignee_options(user, company, department):
 
 
 @frappe.whitelist(methods=["POST"])
+def workflow_assignees(payload=None):
+    """List active, in-scope users through the current workflow assignment rules."""
+    data = parse_payload(payload or "{}")
+    user = actor()
+    company = checked_text(data.get("company"), 140, True)
+    department = checked_text(data.get("department"), 140) or None
+    users, roles = workflow_assignee_options(user, company, department)
+    query = checked_text(data.get("query"), 100).casefold()
+    try:
+        page = int(data.get("page") or 0)
+    except (TypeError, ValueError):
+        fail("error.filters")
+    if page < 0 or page > 10000:
+        fail("error.filters")
+    visible = sorted(
+        (row for row in users if not query or query in row.name.casefold() or query in (row.full_name or "").casefold()),
+        key=lambda row: ((row.full_name or "").casefold(), row.name),
+    )
+    return {
+        "users": [{"name": row.name, "full_name": row.full_name or row.name} for row in visible[page * 20:(page + 1) * 20]],
+        "roles": roles,
+        "page": page,
+        "has_more": len(visible) > (page + 1) * 20,
+    }
+
+
+@frappe.whitelist(methods=["POST"])
 def workflow_role_creation_access(payload=None):
     user = actor()
     data = parse_payload(payload or "{}")

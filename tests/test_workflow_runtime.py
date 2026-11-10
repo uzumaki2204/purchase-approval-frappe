@@ -474,6 +474,35 @@ class WorkflowRuntimeTests(unittest.TestCase):
             {"name": "PA Purchasing", "eligible_user_count": 1},
         ])
 
+    def test_workflow_picker_includes_scoped_purchaser_without_approval_role(self):
+        buyer = types.SimpleNamespace(name="purchase@demo.local", full_name="Người mua demo")
+        outside = types.SimpleNamespace(name="outside@demo.local", full_name="Outside buyer")
+
+        def get_all(doctype, **kwargs):
+            if doctype == "User":
+                self.assertEqual(kwargs["filters"], {"enabled": 1})
+                return [buyer, outside]
+            if doctype == "User Permission":
+                if kwargs["filters"]["allow"] == "Department":
+                    return []
+                company = "C1" if kwargs["filters"]["user"] == buyer.name else "C2"
+                return [types.SimpleNamespace(for_value=company)]
+            if doctype == "Has Role":
+                if "parent" in kwargs["filters"] and isinstance(kwargs["filters"]["parent"], str):
+                    return [types.SimpleNamespace(role="PA Purchasing")]
+                return [types.SimpleNamespace(role="PA Purchasing")]
+            self.fail(doctype)
+
+        with patch.object(workflow_api, "actor", return_value="Administrator"), patch.object(
+            workflow_api, "workflow_admin_scope"
+        ), patch.object(workflow_api.frappe, "get_all", side_effect=get_all, create=True), patch.object(
+            workflow_api.frappe.db, "get_value", return_value=1, create=True
+        ), patch.object(workflow_api.frappe.db, "exists", return_value=True, create=True):
+            result = workflow_api.workflow_assignees({"company": "C1", "department": "D1", "query": "người mua"})
+        self.assertEqual(result["users"], [{"name": buyer.name, "full_name": buyer.full_name}])
+        self.assertEqual(result["roles"], ["PA Purchasing"])
+        self.assertFalse(result["has_more"])
+
     def test_available_roles_require_scope_and_frappe_read_permission(self):
         payload = json.dumps({"company": "C1", "department": "D1"})
         with patch.object(workflow_api, "actor", return_value="admin"), patch.object(
