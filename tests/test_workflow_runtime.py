@@ -27,7 +27,7 @@ from purchase_approval.patches import configurable_request_workflow as migration
 from purchase_approval.patches import multi_user_workflow as multi_user_migration
 from purchase_approval.patches import add_workflow_roles_menu as roles_menu_migration
 from purchase_approval.patches import add_pa_workflow_role_registry as role_schema_migration
-from purchase_approval import install, role_permissions, workflow_api, workflow_roles
+from purchase_approval import install, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
 def localized_error(key):
@@ -43,6 +43,92 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_quotation_override_is_limited_to_active_step_and_super_users(self):
+        request = types.SimpleNamespace(status="Pending Purchasing", current_instance="PAI-1", company="C1", department="D1")
+        current = step(2, "Quotation")
+        instance = types.SimpleNamespace(steps=[current], current_sequence=2, status="Pending", assignees=[
+            types.SimpleNamespace(user="buyer", step_order=2, status="Pending")
+        ])
+        with patch.object(runtime, "is_modern", return_value=True), patch.object(
+            runtime.frappe, "get_doc", return_value=instance, create=True
+        ), patch.object(runtime, "eligible_user", return_value=True), patch.object(
+            runtime, "roles", side_effect=lambda user: {"PA Super Admin"} if user == "super" else set()
+        ):
+            self.assertEqual(runtime.actions(request, "Administrator"), ["finalize"])
+            self.assertEqual(runtime.actions(request, "super"), ["finalize"])
+            self.assertEqual(runtime.actions(request, "buyer"), ["finalize"])
+            self.assertEqual(runtime.actions(request, "other"), [])
+            current.step_type = "Quote Approval"
+            self.assertEqual(runtime.actions(request, "Administrator"), [])
+            current.step_type = "Quotation"
+            instance.status = "Approved"
+            self.assertEqual(runtime.actions(request, "Administrator"), [])
+            instance.status = "Pending"
+            request.status = "Closed"
+            self.assertEqual(runtime.actions(request, "Administrator"), [])
+            request.status = "Pending Purchasing"
+        instance.status = "Pending"
+        with patch.object(runtime, "is_modern", return_value=True), patch.object(
+            runtime.frappe, "get_doc", return_value=instance, create=True
+        ), patch.object(runtime, "eligible_user", return_value=False):
+            self.assertEqual(runtime.actions(request, "Administrator"), [])
+
+    def test_unassigned_admin_quotation_records_actor_and_skips_other_assignee(self):
+        request = types.SimpleNamespace(status="Pending Purchasing")
+        current = step(2, "Quotation")
+        buyer = types.SimpleNamespace(user="buyer", step_order=2, status="Pending")
+        instance = types.SimpleNamespace(name="PAI-1", steps=[current], current_sequence=2,
+                                         status="Pending", assignees=[buyer])
+        instance.append = lambda _field, data: instance.assignees.append(types.SimpleNamespace(**data))
+        with patch.object(runtime, "eligible_user", return_value=True), patch.object(
+            runtime, "advance"
+        ) as advance, patch.object(runtime.frappe, "get_all", return_value=[], create=True):
+            self.assertTrue(runtime.finish_step(request, instance, "Administrator"))
+        self.assertEqual([(row.user, row.status) for row in instance.assignees],
+                         [("buyer", "Skipped"), ("Administrator", "Approved")])
+        advance.assert_called_once_with(request, instance)
+
+    def test_quotation_preflight_reports_missing_legacy_approver_before_write(self):
+        request = types.SimpleNamespace(name="PA-1", company="C1", department="D1", currency="VND",
+                                        requester="creator", modified="2026-11-10 10:00:00", revision=3,
+                                        status="Pending Purchasing", selected_workflow="WF-1", current_instance=None)
+        approval = types.SimpleNamespace(step_order=4, step_name="Duyệt báo giá", step_type="Quote Approval",
+                                         approver_source="Role", approver_role="PA Approver")
+        workflow = types.SimpleNamespace(name="WF-1", steps=[approval])
+        data = {"name": request.name, "expected_modified": request.modified,
+                "expected_revision": request.revision, "selected_workflow": workflow.name}
+        with patch.object(quotation_preflight, "actor", return_value="Administrator"), patch.object(
+            quotation_preflight.frappe.db, "exists", return_value=True, create=True
+        ), patch.object(quotation_preflight.frappe, "get_doc", return_value=request, create=True), patch.object(
+            quotation_preflight, "legacy_scope", return_value=True
+        ), patch.object(quotation_preflight.runtime, "is_modern", return_value=False), patch.object(
+            quotation_preflight.runtime, "candidates", return_value=[workflow]
+        ), patch.object(quotation_preflight, "step_candidates", return_value=["creator", "disabled", "outside"]), patch.object(
+            quotation_preflight, "legacy_approver", side_effect=lambda user, _request: user == "creator"
+        ):
+            result = quotation_preflight.check_quotation_approval(data)
+            self.assertFalse(result["ready"])
+            self.assertEqual(result["missing"], [{"step_order": 4, "step_name": "Duyệt báo giá",
+                                                   "source": "Role", "target": "PA Approver"}])
+            with patch.object(quotation_preflight, "legacy_approver", side_effect=lambda user, _request: user == "outside"):
+                self.assertTrue(quotation_preflight.check_quotation_approval(data)["ready"])
+            workflow.steps = []
+            self.assertTrue(quotation_preflight.check_quotation_approval(data)["no_approval_step"])
+            data["expected_revision"] = 2
+            with self.assertRaises(ValueError):
+                quotation_preflight.check_quotation_approval(data)
+
+    def test_legacy_approver_requires_active_scoped_user_and_approval_role(self):
+        request = types.SimpleNamespace(company="C1", department="D1", requester="creator")
+        with patch.object(quotation_preflight.frappe.db, "get_value", side_effect=lambda _doctype, user, _field: user != "disabled"), patch.object(
+            quotation_preflight, "legacy_scope", side_effect=lambda user, _request: user != "outside"
+        ), patch.object(quotation_preflight, "is_super_user", return_value=False), patch.object(
+            quotation_preflight.runtime, "roles", side_effect=lambda user: {"PA Approver"} if user != "no-role" else set()
+        ):
+            self.assertTrue(quotation_preflight.legacy_approver("approver", request))
+            for user in ("disabled", "outside", "no-role"):
+                self.assertFalse(quotation_preflight.legacy_approver(user, request))
+
     def test_workflow_error_uses_catalog_when_site_translation_is_missing(self):
         expected = json.loads((path.parent / "ui-translations.json").read_text(encoding="utf-8"))["messages"][
             "error.workflow_in_use"

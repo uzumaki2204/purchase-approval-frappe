@@ -139,7 +139,14 @@ def active_step(instance):
 
 
 def assigned(instance, user):
-    return any(row.user == user and row.step_order == instance.current_sequence and row.status == "Pending" for row in instance.assignees)
+    if any(row.user == user and row.step_order == instance.current_sequence and row.status == "Pending" for row in instance.assignees):
+        return True
+    step = active_step(instance)
+    return bool(
+        step and step.step_type == "Quotation" and step.status == "Pending"
+        and getattr(instance, "status", None) == "Pending"
+        and (user == "Administrator" or "PA Super Admin" in roles(user))
+    )
 
 
 def save(doc):
@@ -254,6 +261,13 @@ def finish_step(request, instance, user, comment=""):
             as_dict=True,
         )
     acted_at = frappe.utils.now()
+    if step.step_type == "Quotation" and not any(
+        row.step_order == step.step_order and row.user == user and row.status == "Pending"
+        for row in instance.assignees
+    ):
+        # Record the actual actor when a scoped administrator completes an
+        # unassigned quotation. The other assignees are skipped by Any below.
+        instance.append("assignees", {"step_order": step.step_order, "user": user, "status": "Pending"})
     row = next(row for row in instance.assignees if row.step_order == step.step_order and row.user == user and row.status == "Pending")
     row.status = "Approved"
     row.acted_at = acted_at
@@ -310,6 +324,8 @@ def actions(request, user):
     instance = frappe.get_doc(INSTANCE, request.current_instance)
     step = active_step(instance)
     if not step or not assigned(instance, user) or not eligible_user(user, request):
+        return []
+    if step.step_type == "Quotation" and request.status != "Pending Purchasing":
         return []
     return {"Stock Check": ["stock_check"], "Purchase Handoff": ["confirm_handoff"], "Quotation": ["finalize"], "Quote Approval": ["approve", "return", "reject"], "Receiving": ["receive"]}.get(step.step_type, [])
 

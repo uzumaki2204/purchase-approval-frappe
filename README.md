@@ -48,6 +48,8 @@ Từ v2.0.22, trang **Quy trình phê duyệt** có nút **Xóa** với hộp x�
 
 Từ v2.0.23, API xóa quy trình dùng catalog tiếng Việt của app khi site chưa có bản ghi dịch mới; trang cũng nhận diện khóa lỗi Frappe và hiển thị thông báo đã dịch. Quy tắc chỉ xóa quy trình chưa được sử dụng vẫn được giữ nguyên.
 
+Từ v2.0.24, Administrator và PA Super Admin có thể hoàn tất bước Báo giá trong phạm vi được cấp quyền dù không có tên trong phân công. Trước khi chốt, form kiểm tra người duyệt của quy trình đã chọn và chỉ rõ bước, User hoặc Role cần cấu hình nếu phiếu cũ chưa có người duyệt hợp lệ. Server Script vẫn kiểm tra lại khi lưu; quyền duyệt báo giá không thay đổi.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.
