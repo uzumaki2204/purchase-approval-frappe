@@ -66,6 +66,8 @@ Từ v2.0.31, patch Pilot sửa trường Nguồn chọn quy trình của PA Pur
 
 Từ v2.0.32, patch Pilot bổ sung API chọn quy trình và xác nhận kiểm tra kho vào danh sách thao tác được các Server Script bảo vệ phiên duyệt, lịch sử và phiếu chấp nhận. Patch chỉ cập nhật dòng danh sách API đã biết, giữ nguyên các chỉnh sửa khác trên site. Phiếu đang ở bước Kiểm tra kho tiếp tục được sau khi nâng cấp.
 
+Từ v2.0.33, patch Pilot bổ sung API xác nhận bàn giao đề nghị mua vào cùng danh sách bảo vệ. Site đã cài v2.0.32 sẽ được cập nhật ba Server Script liên quan mà không thay đổi phần mã khác; phiếu đang chờ bàn giao tiếp tục ở bước hiện tại.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

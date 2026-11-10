@@ -81,6 +81,20 @@ class WorkflowRuntimeTests(unittest.TestCase):
         altered = target[: match.start(1)] + repr([*commands[:8], "unknown_command"]) + target[match.end(1) :]
         self.assertIsNone(guard_migration.upgraded_script(altered, target))
 
+    def test_guard_migration_adds_handoff_to_already_upgraded_site(self):
+        managed = {row["name"]: row["script"] for row in install.metadata()["server_scripts"]}
+        for name in guard_migration.GUARDS:
+            target = managed[name]
+            match, commands = guard_migration.commands_match(target)
+            self.assertEqual(commands[-1], "confirm_purchase_handoff")
+            previous = target[: match.start(1)] + repr(commands[:-1]) + target[match.end(1) :]
+            previous = previous.replace("    # All business writes", "    # Local note.\n    # All business writes", 1)
+            updated = guard_migration.upgraded_script(previous, target)
+            self.assertIsNotNone(updated)
+            self.assertIn("# Local note.", updated)
+            self.assertIn("'confirm_purchase_handoff'", updated)
+            self.assertEqual(guard_migration.upgraded_script(updated, target), updated)
+
     def test_schema_migration_repairs_installed_workflow_fields(self):
         old_options = "\nRequester\nPurchasing"
         docs = {
