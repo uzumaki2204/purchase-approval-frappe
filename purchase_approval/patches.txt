@@ -13,3 +13,4 @@ purchase_approval.patches.add_workflow_roles_menu
 purchase_approval.patches.add_pa_workflow_role_registry
 purchase_approval.patches.backfill_pa_workflow_roles
 purchase_approval.patches.upgrade_legacy_finalize_script
+purchase_approval.patches.activate_step_notifications

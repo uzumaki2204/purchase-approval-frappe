@@ -25,3 +25,7 @@ app_include_css = ['/assets/purchase_approval/css/desk-navigation.css']
 before_install = 'purchase_approval.install.before_install'
 after_install = 'purchase_approval.install.after_install'
 after_migrate = 'purchase_approval.install.after_migrate'
+
+scheduler_events = {
+    'hourly': ['purchase_approval.notification_delivery.retry_pending'],
+}

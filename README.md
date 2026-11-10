@@ -16,7 +16,7 @@
 3. Chạy build assets và migrate nếu Pilot chưa tự thực hiện; sau đó tải lại worker và web.
 4. Gán một Role `PA` phù hợp cho người dùng và thiết lập quy trình duyệt, người duyệt, nhà cung cấp và email trên site đích.
 
-App tạo metadata mặc định gồm 17 DocType, Page, Sidebar, 8 Role, 51 Server Script, 3 Client Script, Print Format và bản dịch tiếng Việt. Bản cài không chứa đề nghị mua hàng, lịch sử, người dùng, hai quy trình duyệt của site nguồn hoặc thông tin xác thực email/Graph. Scheduler gửi thông báo được để tắt; quản trị viên bật sau khi cấu hình email.
+App tạo metadata mặc định gồm 17 DocType, Page, Sidebar, 8 Role, 51 Server Script, 3 Client Script, Print Format và bản dịch tiếng Việt. Bản cài không chứa đề nghị mua hàng, lịch sử, người dùng, hai quy trình duyệt của site nguồn hoặc thông tin xác thực email/Graph. Gửi email mặc định tắt trong PA Settings; quản trị viên bật sau khi cấu hình SMTP hoặc Graph. Scheduler của app thử lại các email còn chờ khi cần.
 
 Từ v2.0.8, mỗi quy trình có thể cấu hình thứ tự các bước kiểm tra kho, bàn giao đề nghị mua, báo giá, duyệt báo giá và nhận hàng. Người xử lý được gán bằng User hoặc Role; mỗi bước có cờ email riêng. Người tạo vẫn lập và gửi phiếu. Nếu chỉ một quy trình phù hợp, hệ thống chọn tự động; nếu nhiều quy trình phù hợp, phiếu chờ người được cấu hình chọn. Sau khi nâng cấp, các quy trình cũ có chuỗi bước mặc định và các bước duyệt đang chạy giữ nguyên snapshot. Quản trị viên cần gán thành viên cho Role `PA Stock Checker` trước khi gửi phiếu mới theo quy trình đã chuyển đổi.
 
@@ -53,6 +53,8 @@ Từ v2.0.24, Administrator và PA Super Admin có thể hoàn tất bước Bá
 Từ v2.0.25, trình chọn User trong quy trình dùng API Python hiện hành thay cho Server Script `pa_workflow_assignees` cũ trên site. User đang hoạt động và đủ phạm vi công ty/phòng ban có thể được chọn cho bước Báo giá dù chỉ có Role `PA Purchasing`; việc lưu và thực thi bước vẫn kiểm tra cùng phạm vi. Không thay đổi Server Script đã tùy chỉnh hoặc DocType của site.
 
 Từ v2.0.26, patch Pilot nâng cấp Server Script `pa_finalize_purchase_request` còn nguyên bản v2.0.7 lên mã hiện hành. Nhờ đó phiếu cũ khi chốt giá chỉ tạo lượt duyệt cho bước Duyệt báo giá, không bắt người mua hàng có Role phê duyệt. Patch nhận diện script bằng SHA-256 trước khi thay; script đã tùy chỉnh được giữ nguyên.
+
+Từ v2.0.27, phiếu mới bắt đầu quy trình ngay khi gửi. Bước Kiểm tra kho và Bàn giao đề nghị mua tạo email cho người được giao khi bước trở thành hiện hành và cờ gửi email của bước được bật. Job nền xử lý thư sau khi giao dịch lưu thành công; Scheduler thử lại các thư còn chờ. Patch Pilot chỉ ghép các hàm cần thiết trong Server Script cũ và giữ các chỉnh sửa không trùng vùng. Phiếu đã gửi trước bản cập nhật giữ nguyên trạng thái và không được tạo thêm thông báo.
 
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 

@@ -615,7 +615,9 @@
     "error.role_manage_permission": "Cần quyền System Manager để sửa quyền DocType.",
     "error.role_permissions_invalid": "Ma trận quyền không hợp lệ. Kiểm tra quyền cơ bản và quyền phụ thuộc.",
     "error.role_permissions_conflict": "Quyền Role đã thay đổi. Tải lại ma trận trước khi lưu.",
-    "error.role_permissions_advanced": "DocType có nhiều quy tắc mức 0; hãy chỉnh trong Role Permissions Manager của Frappe."
+    "error.role_permissions_advanced": "DocType có nhiều quy tắc mức 0; hãy chỉnh trong Role Permissions Manager của Frappe.",
+    "error.email_queue": "Không thể xếp lịch gửi email; hệ thống sẽ thử lại.",
+    "error.email_recipient_missing": "Tài khoản được giao chưa có địa chỉ email."
   },
   "roles": [
     "PA Requester",

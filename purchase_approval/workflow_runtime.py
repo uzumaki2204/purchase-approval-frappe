@@ -154,6 +154,23 @@ def save(doc):
     doc.save(ignore_permissions=True)
 
 
+def schedule_notification_delivery(outbox_names):
+    """Dispatch only newly queued mail after the transaction has committed."""
+    frappe.db.after_commit.add(lambda: _queue_notification_delivery(outbox_names))
+
+
+def _queue_notification_delivery(outbox_names):
+    try:
+        frappe.enqueue(
+            "purchase_approval.notification_delivery.dispatch_pending",
+            queue="long",
+            outbox_names=outbox_names,
+        )
+    except Exception:
+        # The outbox remains Pending for the scheduled retry path.
+        frappe.logger("purchase_approval").exception(tr("error.email_queue"))
+
+
 def enqueue(request, instance, step=None):
     if step is None:
         if not snapshot(instance).get("notify_requester"):
@@ -163,15 +180,21 @@ def enqueue(request, instance, step=None):
         targets = [(step.step_order, row.user, "notification.step_subject", "notification.step_body") for row in instance.assignees if row.step_order == step.step_order and row.status == "Pending"]
     else:
         return
+    pending_delivery = []
     for order, recipient, subject_key, body_key in targets:
         key = f"{instance.name}:{order}:{recipient}"
         existing = frappe.db.get_value(OUTBOX, {"notification_key": key}, ["name", "status"], as_dict=True)
         if existing:
             if existing.status == "Cancelled":
                 frappe.db.set_value(OUTBOX, existing.name, "status", "Pending", update_modified=False)
+                pending_delivery.append(existing.name)
             continue
         body = tr(body_key).replace("{step}", step.step_name) if step else tr(body_key)
-        frappe.get_doc({"doctype": OUTBOX, "request": request.name, "instance": instance.name, "step_order": order, "recipient": recipient, "notification_key": key, "subject": f"{tr(subject_key)} {request.name}", "body": body, "status": "Pending"}).insert(ignore_permissions=True)
+        outbox = frappe.get_doc({"doctype": OUTBOX, "request": request.name, "instance": instance.name, "step_order": order, "recipient": recipient, "notification_key": key, "subject": f"{tr(subject_key)} {request.name}", "body": body, "status": "Pending"})
+        outbox.insert(ignore_permissions=True)
+        pending_delivery.append(outbox.name)
+    if pending_delivery:
+        schedule_notification_delivery(pending_delivery)
 
 
 def advance(request, instance):

@@ -1,17 +1,17 @@
 {
   "app": "purchase_approval",
-  "version": "2.0.26",
+  "version": "2.0.27",
   "branch": "version-16",
-  "tag": "v2.0.26",
+  "tag": "v2.0.27",
   "code_commit": "a87ca3a0f171fe40b5bcdb534c5481b7976b6819",
   "frappe": ">=16.53.0,<17.0.0",
   "factory_management": ">=0.1.29,<0.2.0",
-  "metadata_sha256": "5a1d25145b0924bd10ea9eb36ed45542788df1f059d8bfb7b7578ee14b502150",
+  "metadata_sha256": "49eb3c207db372a2acb07c946be3f58a1d4ff3485f50aa1b2d74740e86834430",
   "metadata_counts": {
     "doctypes": 18,
     "roles": 8,
     "server_scripts": 51,
     "client_scripts": 3,
-    "translations": 586
+    "translations": 588
   }
 }

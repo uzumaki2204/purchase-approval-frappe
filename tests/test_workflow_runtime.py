@@ -29,7 +29,8 @@ from purchase_approval.patches import multi_user_workflow as multi_user_migratio
 from purchase_approval.patches import add_workflow_roles_menu as roles_menu_migration
 from purchase_approval.patches import add_pa_workflow_role_registry as role_schema_migration
 from purchase_approval.patches import upgrade_legacy_finalize_script as finalize_migration
-from purchase_approval import install, quotation_preflight, role_permissions, workflow_api, workflow_roles
+from purchase_approval.patches import activate_step_notifications as notification_migration
+from purchase_approval import install, notification_delivery, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
 def localized_error(key):
@@ -685,14 +686,80 @@ class WorkflowRuntimeTests(unittest.TestCase):
         current.step_name = "Kiểm tra kho"
         created = []
         with patch.object(runtime.frappe.db, "exists", return_value=False, create=True), patch.object(
-            runtime.frappe, "get_doc", side_effect=lambda doc: types.SimpleNamespace(insert=lambda **_kwargs: created.append(doc)), create=True
-        ), patch.object(runtime, "tr", side_effect=lambda key: "Bước {step}" if key == "notification.step_body" else key):
+            runtime.frappe, "get_doc", side_effect=lambda doc: types.SimpleNamespace(name="OUT-1", insert=lambda **_kwargs: created.append(doc)), create=True
+        ), patch.object(runtime, "tr", side_effect=lambda key: "Bước {step}" if key == "notification.step_body" else key), patch.object(
+            runtime, "schedule_notification_delivery"
+        ) as schedule:
             runtime.enqueue(request, instance, current)
             current.send_email = 1
             runtime.enqueue(request, instance, current)
         self.assertEqual(len(created), 1)
         self.assertEqual(created[0]["notification_key"], "PAI-1:1:checker")
         self.assertEqual(created[0]["body"], "Bước Kiểm tra kho")
+        schedule.assert_called_once_with(["OUT-1"])
+
+    def test_notification_dispatch_is_registered_after_commit(self):
+        callbacks = []
+        with patch.object(runtime.frappe.db, "after_commit", types.SimpleNamespace(add=callbacks.append), create=True
+        ), patch.object(runtime.frappe, "enqueue", create=True) as enqueue:
+            runtime.schedule_notification_delivery(["OUT-1", "OUT-2"])
+            self.assertEqual(len(callbacks), 1)
+            enqueue.assert_not_called()
+            callbacks[0]()
+        enqueue.assert_called_once_with("purchase_approval.notification_delivery.dispatch_pending", queue="long", outbox_names=["OUT-1", "OUT-2"])
+
+    def test_notification_patch_preserves_unrelated_script_edits(self):
+        baselines = json.loads(notification_migration.BASELINES.read_text(encoding="utf-8"))
+        managed = {row["name"]: row["script"] for row in install.metadata()["server_scripts"]}
+        for name in notification_migration.SCRIPTS:
+            blocks = "".join(baselines[name][function]["legacy"] for function in notification_migration.SCRIPTS[name])
+            if name == "pa_submit_purchase_request":
+                blocks = blocks.replace("request.priced_at = None", "request.priced_at = None  # site note")
+            current = "def pa_execute(doc=None):\n" + blocks + "    def local_customization():\n        return 7\n"
+            updated = notification_migration.upgraded_script(name, current, managed[name], baselines)
+            self.assertIsNotNone(updated)
+            self.assertIn("    def local_customization():\n        return 7\n", updated)
+            if name == "pa_submit_purchase_request":
+                self.assertIn("request.priced_at = None  # site note", updated)
+            self.assertEqual(notification_migration.upgraded_script(name, updated, managed[name], baselines), updated)
+            for function in notification_migration.SCRIPTS[name]:
+                target_span = notification_migration.function_span(managed[name], function)
+                updated_span = notification_migration.function_span(updated, function)
+                if name != "pa_submit_purchase_request" or function != "submit_request":
+                    self.assertEqual(notification_migration.script_lines(updated[slice(*updated_span)]),
+                                     notification_migration.script_lines(managed[name][slice(*target_span)]))
+
+    def test_notification_patch_rejects_overlapping_site_change(self):
+        baselines = json.loads(notification_migration.BASELINES.read_text(encoding="utf-8"))
+        name = "pa_submit_purchase_request"
+        old = baselines[name]["submit_request"]["legacy"]
+        modified = old.replace("request.status = 'Pending Purchasing'", "request.status = 'Custom Status'")
+        current = "def pa_execute(doc=None):\n" + modified + baselines[name]["request_actions"]["legacy"] + "    def other():\n        pass\n"
+        target = next(row["script"] for row in install.metadata()["server_scripts"] if row["name"] == name)
+        self.assertIsNone(notification_migration.upgraded_script(name, current, target, baselines))
+
+    def test_delivery_uses_managed_worker_and_respects_email_switch(self):
+        script = types.SimpleNamespace(script_type="Scheduler Event", execute_scheduled_method=lambda: None)
+        local = types.SimpleNamespace(form_dict={"existing": "value"})
+        with patch.object(notification_delivery.frappe.db, "get_single_value", return_value=0, create=True), patch.object(
+            notification_delivery.frappe, "get_doc", return_value=script, create=True
+        ) as get_doc:
+            notification_delivery.dispatch_pending()
+            get_doc.assert_not_called()
+        with patch.object(notification_delivery.frappe.db, "get_single_value", return_value=1, create=True), patch.object(
+            notification_delivery.frappe, "get_doc", return_value=script, create=True
+        ), patch.object(notification_delivery.frappe, "set_user", create=True) as set_user, patch.object(
+            notification_delivery.frappe, "local", local, create=True
+        ), patch.object(notification_delivery.frappe, "_dict", dict, create=True), patch.object(
+            script, "execute_scheduled_method"
+        ) as execute:
+            observed = []
+            execute.side_effect = lambda: observed.append(local.form_dict.get("pa_notification_only"))
+            notification_delivery.dispatch_pending(["OUT-1"])
+            set_user.assert_called_once_with("Administrator")
+            execute.assert_called_once_with()
+            self.assertEqual(observed, [["OUT-1"]])
+            self.assertEqual(local.form_dict, {"existing": "value"})
 
     def test_handoff_email_remains_valid_after_auto_advance(self):
         request = types.SimpleNamespace(status="Pending Purchasing", current_instance="PAI-1")
