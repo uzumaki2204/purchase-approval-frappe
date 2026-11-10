@@ -30,6 +30,7 @@ from purchase_approval.patches import add_workflow_roles_menu as roles_menu_migr
 from purchase_approval.patches import add_pa_workflow_role_registry as role_schema_migration
 from purchase_approval.patches import upgrade_legacy_finalize_script as finalize_migration
 from purchase_approval.patches import activate_step_notifications as notification_migration
+from purchase_approval.patches import repair_purchase_request_status_options as status_migration
 from purchase_approval import install, notification_delivery, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
@@ -46,6 +47,39 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_status_migration_repairs_effective_choices_and_preserves_custom_values(self):
+        old = "Draft\nPending Purchasing\nPending Approval\nApproved\nClosed\nReturned\nRejected\nCancelled\nCustom State"
+        expected = "Draft\nPending Workflow Selection\nPending Stock Check\nPending Purchasing\nPending Approval\nApproved\nClosed\nReturned\nRejected\nCancelled"
+        values = {"DocField": old, "Property Setter": old}
+        writes = []
+
+        def get_value(_doctype, _filters, _fields, **_kwargs):
+            return types.SimpleNamespace(name="FIELD-1", options=values["DocField"])
+
+        def set_value(doctype, _name, _field, value, **_kwargs):
+            values[doctype] = value
+            writes.append(doctype)
+
+        def get_meta(_doctype):
+            return types.SimpleNamespace(get_field=lambda _field: types.SimpleNamespace(options=values["Property Setter"]))
+
+        payload = {"doctypes": [{"name": status_migration.DOCTYPE, "fields": [
+            {"fieldname": "status", "options": expected}
+        ]}]}
+        with patch.object(status_migration, "metadata", return_value=payload), patch.object(
+            status_migration.frappe.db, "get_value", side_effect=get_value
+        ), patch.object(status_migration.frappe.db, "set_value", side_effect=set_value, create=True), patch.object(
+            status_migration.frappe, "get_all", return_value=[types.SimpleNamespace(name="SET-1", value=old)], create=True
+        ) as setters, patch.object(status_migration.frappe, "get_meta", side_effect=get_meta, create=True), patch.object(
+            status_migration.frappe, "clear_cache", create=True
+        ):
+            status_migration.execute()
+            self.assertEqual(writes, ["DocField", "Property Setter"])
+            self.assertEqual(values["Property Setter"], expected + "\nCustom State")
+            setters.return_value[0].value = values["Property Setter"]
+            status_migration.execute()
+            self.assertEqual(writes, ["DocField", "Property Setter"])
+
     def test_capabilities_handles_legacy_approval_step_without_step_type(self):
         assignee = types.SimpleNamespace(user="approver", status="Pending", step_order=1)
         legacy_step = types.SimpleNamespace(step_order=1, step_name="Manager", status="Pending")
