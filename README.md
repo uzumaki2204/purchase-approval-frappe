@@ -52,6 +52,8 @@ Từ v2.0.24, Administrator và PA Super Admin có thể hoàn tất bước Bá
 
 Từ v2.0.25, trình chọn User trong quy trình dùng API Python hiện hành thay cho Server Script `pa_workflow_assignees` cũ trên site. User đang hoạt động và đủ phạm vi công ty/phòng ban có thể được chọn cho bước Báo giá dù chỉ có Role `PA Purchasing`; việc lưu và thực thi bước vẫn kiểm tra cùng phạm vi. Không thay đổi Server Script đã tùy chỉnh hoặc DocType của site.
 
+Từ v2.0.26, patch Pilot nâng cấp Server Script `pa_finalize_purchase_request` còn nguyên bản v2.0.7 lên mã hiện hành. Nhờ đó phiếu cũ khi chốt giá chỉ tạo lượt duyệt cho bước Duyệt báo giá, không bắt người mua hàng có Role phê duyệt. Patch nhận diện script bằng SHA-256 trước khi thay; script đã tùy chỉnh được giữ nguyên.
+
 v2.0.9 cho phép patch nâng cấp nhận đúng Server Script `pa_scope_query_size` mà bộ cài đã tự chuyển từ `Size` sang `ProductSize`; các chỉnh sửa tùy biến khác vẫn được bảo vệ.
 
 Metadata được ghi trong `purchase_approval/metadata/purchase_approval.json`. Hook cài đặt chỉ thêm các bản ghi còn thiếu; migrate lần sau không ghi đè cấu hình đã chỉnh trên site. Page JavaScript/CSS, biểu tượng và bản dịch được phân phát từ app, không cần tệp trong `/files` của site nguồn.

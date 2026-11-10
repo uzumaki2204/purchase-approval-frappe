@@ -1,6 +1,7 @@
 """Checks for workflow ordering, automatic handoff and assignment boundaries."""
 
 import importlib.util
+import hashlib
 import json
 import re
 import sys
@@ -27,6 +28,7 @@ from purchase_approval.patches import configurable_request_workflow as migration
 from purchase_approval.patches import multi_user_workflow as multi_user_migration
 from purchase_approval.patches import add_workflow_roles_menu as roles_menu_migration
 from purchase_approval.patches import add_pa_workflow_role_registry as role_schema_migration
+from purchase_approval.patches import upgrade_legacy_finalize_script as finalize_migration
 from purchase_approval import install, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
@@ -43,6 +45,25 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_finalize_patch_upgrades_known_legacy_script_only(self):
+        self.assertEqual(finalize_migration.LEGACY_SHA256, "fb9e7e0a9965d95d2b1123d0b16c01f72c213c45d698051272472c14a3ec38b6")
+        managed = next(row["script"] for row in install.metadata()["server_scripts"] if row["name"] == finalize_migration.SCRIPT)
+        self.assertIn("if step.step_type and step.step_type != 'Quote Approval':", managed)
+        old = "legacy finalized script"
+        target = "current finalized script"
+        with patch.object(finalize_migration, "LEGACY_SHA256", hashlib.sha256(old.encode("utf-8")).hexdigest()), patch.object(
+            finalize_migration.frappe.db, "exists", return_value=True, create=True
+        ), patch.object(finalize_migration.frappe.db, "get_value", return_value=old, create=True), patch.object(
+            finalize_migration, "metadata", return_value={"server_scripts": [{"name": finalize_migration.SCRIPT, "script": target}]}
+        ), patch.object(finalize_migration.frappe.db, "set_value", create=True) as save, patch.object(
+            finalize_migration.frappe, "clear_cache", create=True
+        ) as clear:
+            finalize_migration.execute()
+            save.assert_called_once_with("Server Script", finalize_migration.SCRIPT, "script", target, update_modified=False)
+            clear.assert_called_once_with()
+            self.assertIsNone(finalize_migration.replacement(old + "\n# site customization", target))
+            self.assertIsNone(finalize_migration.replacement(target, target))
+
     def test_quotation_override_is_limited_to_active_step_and_super_users(self):
         request = types.SimpleNamespace(status="Pending Purchasing", current_instance="PAI-1", company="C1", department="D1")
         current = step(2, "Quotation")
