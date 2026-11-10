@@ -33,6 +33,7 @@ from purchase_approval.patches import upgrade_legacy_finalize_script as finalize
 from purchase_approval.patches import activate_step_notifications as notification_migration
 from purchase_approval.patches import repair_purchase_request_status_options as status_migration
 from purchase_approval.patches import repair_workflow_schema as schema_migration
+from purchase_approval.patches import repair_workflow_guard_commands as guard_migration
 from purchase_approval import install, notification_delivery, quotation_preflight, role_permissions, workflow_api, workflow_roles
 
 
@@ -49,6 +50,37 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_guard_migration_adds_new_api_paths_without_replacing_local_code(self):
+        managed = {row["name"]: row["script"] for row in install.metadata()["server_scripts"]}
+        installed = {}
+        for name in guard_migration.GUARDS:
+            target = managed[name]
+            match, commands = guard_migration.commands_match(target)
+            old = target[: match.start(1)] + repr(commands[:8]) + target[match.end(1) :]
+            installed[name] = old.replace("    # All business writes", "    # Local note.\n    # All business writes", 1)
+        writes = {}
+
+        with patch.object(guard_migration.frappe.db, "exists", return_value=True, create=True), patch.object(
+            guard_migration.frappe.db, "get_value", side_effect=lambda _dt, name, _field: installed[name]
+        ), patch.object(guard_migration.frappe.db, "set_value", side_effect=lambda _dt, name, _field, script, **_kwargs: writes.__setitem__(name, script), create=True), patch.object(
+            guard_migration.frappe, "clear_cache", create=True
+        ):
+            guard_migration.execute()
+
+        self.assertEqual(set(writes), set(guard_migration.GUARDS))
+        for name, script in writes.items():
+            self.assertIn("# Local note.", script)
+            self.assertIn("'confirm_stock_check'", script)
+            self.assertIn("'choose_approval_workflow'", script)
+            self.assertEqual(guard_migration.upgraded_script(script, managed[name]), script)
+
+    def test_guard_migration_rejects_unknown_api_path(self):
+        managed = {row["name"]: row["script"] for row in install.metadata()["server_scripts"]}
+        target = managed["pa_instance_guard"]
+        match, commands = guard_migration.commands_match(target)
+        altered = target[: match.start(1)] + repr([*commands[:8], "unknown_command"]) + target[match.end(1) :]
+        self.assertIsNone(guard_migration.upgraded_script(altered, target))
+
     def test_schema_migration_repairs_installed_workflow_fields(self):
         old_options = "\nRequester\nPurchasing"
         docs = {
