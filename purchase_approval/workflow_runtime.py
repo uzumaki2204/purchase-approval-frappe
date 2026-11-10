@@ -222,7 +222,9 @@ def begin(request, workflow, source):
     workflow.reload()
     if workflow.name not in {row.name for row in candidates(request)}:
         fail("error.workflow")
-    snapshot = workflow.as_dict()
+    # A Frappe Document contains datetime values (including creation and
+    # modified). Normalize them before writing to the instance JSON field.
+    snapshot = json.loads(frappe.as_json(workflow.as_dict()))
     snapshot["workflow_schema"] = 2
     instance = frappe.get_doc({"doctype": INSTANCE, "request": request.name, "company": request.company, "department": request.department, "workflow": workflow.name, "workflow_name": workflow.workflow_name, "workflow_version": workflow.modified, "workflow_snapshot": snapshot, "revision": request.revision, "status": "Pending", "steps": [], "assignees": []})
     selected_by_order = {}

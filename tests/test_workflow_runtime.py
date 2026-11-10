@@ -7,6 +7,7 @@ import re
 import sys
 import types
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -47,6 +48,50 @@ def step(order, kind, status="Pending", email=0, method="Any"):
 
 
 class WorkflowRuntimeTests(unittest.TestCase):
+    def test_begin_serializes_workflow_dates_before_inserting_instance(self):
+        created = datetime(2026, 11, 10, 14, 57, 34)
+        definition = types.SimpleNamespace(
+            step_order=1, step_type="Stock Check", step_name="Check stock",
+            approval_method="Any", send_email=1,
+        )
+        workflow = types.SimpleNamespace(
+            name="WF-1", workflow_name="Workflow", modified=created,
+            steps=[definition], assignees=[], reload=lambda: None,
+            as_dict=lambda: {
+                "name": "WF-1", "creation": created, "notify_requester": 1,
+                "steps": [{"step_name": "Check stock", "modified": created}],
+            },
+        )
+        request = types.SimpleNamespace(name="PA-1", company="C1", department="D1", revision=1)
+        instance = types.SimpleNamespace(name="PAI-1", flags=types.SimpleNamespace())
+
+        def get_doc(values):
+            for key, value in values.items():
+                setattr(instance, key, value)
+            return instance
+
+        def append(field, values):
+            getattr(instance, field).append(types.SimpleNamespace(**values))
+
+        def insert(**_kwargs):
+            json.dumps(instance.workflow_snapshot)
+
+        instance.append = append
+        instance.insert = insert
+        with patch.object(runtime.frappe.db, "sql", create=True), patch.object(
+            runtime.frappe, "as_json", side_effect=lambda value: json.dumps(value, default=str), create=True
+        ), patch.object(runtime.frappe, "get_doc", side_effect=get_doc, create=True), patch.object(
+            runtime, "candidates", return_value=[workflow]
+        ), patch.object(runtime, "assignees", return_value=["checker"]), patch.object(
+            runtime, "advance"
+        ), patch.object(runtime, "enqueue"):
+            self.assertIs(runtime.begin(request, workflow, "Automatic"), instance)
+        self.assertEqual(instance.workflow_snapshot["workflow_schema"], 2)
+        self.assertEqual(instance.workflow_snapshot["notify_requester"], 1)
+        self.assertEqual(instance.workflow_snapshot["creation"], str(created))
+        self.assertEqual(instance.workflow_snapshot["steps"][0]["modified"], str(created))
+        self.assertEqual([(row.step_order, row.user) for row in instance.assignees], [(1, "checker")])
+
     def test_status_migration_repairs_effective_choices_and_preserves_custom_values(self):
         old = "Draft\nPending Purchasing\nPending Approval\nApproved\nClosed\nReturned\nRejected\nCancelled\nCustom State"
         expected = "Draft\nPending Workflow Selection\nPending Stock Check\nPending Purchasing\nPending Approval\nApproved\nClosed\nReturned\nRejected\nCancelled"
